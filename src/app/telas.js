@@ -1951,13 +1951,22 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       const pv = []; sel.forEach((m) => { const sd = relSaldos(m), pa = (ant.prev || {})[m] || {}; new Set([...Object.keys(sd), ...Object.keys(pa)]).forEach((nm) => { const a = pa[nm] || 0, b = sd[nm] ? sd[nm].s : 0; if (Math.abs(a - b) >= 0.005) pv.push('<tr><td>' + ms(m) + '</td><td>' + esc(nm) + '</td><td class="r">' + n(a) + '</td><td class="r">' + n(b) + '</td><td class="r">' + sg(b - a) + '</td></tr>'); }); });
       if (pv.length) h += '<h2>Previsões que mudaram (saldo que falta lançar, R$)</h2><table><thead><tr><th>Mês</th><th>Previsão</th><th class="r">Último PDF</th><th class="r">Agora</th><th class="r">Dif.</th></tr></thead><tbody>' + pv.join('') + '</tbody></table>';
       pages.push({ t: 'O que mudou', h });
-      // detalhe: saíram e mudaram de valor (as novas e pagas aparecem marcadas nas listas)
-      const det = [];
-      cont.saiu.sort((a, b) => a.a[0].localeCompare(b.a[0])).forEach((x) => det.push('<tr><td>' + dm(fotoData(x.a[0])) + '</td><td>' + esc(x.a[3] || x.k) + (x.a[2] === 'O' ? ' <em>oficina não recebida</em>' : '') + '</td><td class="mut">' + esc(x.onde) + '</td><td class="r">' + n(x.a[1]) + '</td></tr>'));
-      const det2 = cont.valor.sort((a, b) => a.x.d.localeCompare(b.x.d)).map((y) => '<tr><td>' + dm(y.x.d) + '</td><td>' + esc(y.x.c.forn) + '</td><td class="r mut">' + n(y.a[1]) + '</td><td class="r">' + n(y.x.v) + '</td><td class="r">' + sg(y.x.v - y.a[1]) + '</td></tr>');
-      const R = 42;
-      for (let i = 0; i < Math.max(det.length, 1) && det.length; i += R) pages.push({ t: 'O que mudou', h: '<h1 class="h1s">Saíram do período desde o último PDF</h1><p class="sub">' + cont.saiu.length + ' lançamentos · ' + money(cont.saiu.reduce((a, x) => a + x.a[1], 0)) + (i ? ' · continuação' : '') + '</p><table class="ls"><thead><tr><th style="width:52px">Era em</th><th>Descrição no último PDF</th><th style="width:210px">Agora</th><th class="r" style="width:90px">Valor (R$)</th></tr></thead><tbody>' + det.slice(i, i + R).join('') + '</tbody></table>' });
-      for (let i = 0; i < det2.length; i += R) pages.push({ t: 'O que mudou', h: '<h1 class="h1s">Mudaram de valor desde o último PDF</h1><p class="sub">' + cont.valor.length + ' lançamentos' + (i ? ' · continuação' : '') + '</p><table class="ls"><thead><tr><th style="width:52px">Data</th><th>Descrição</th><th class="r" style="width:90px">Era</th><th class="r" style="width:90px">Agora</th><th class="r" style="width:80px">Dif.</th></tr></thead><tbody>' + det2.slice(i, i + R).join('') + '</tbody></table>' });
+      // todas as mudanças numa lista só, por tipo (começa na mesma página do resumo e continua nas seguintes)
+      const L = [], grp = (tit, qtd, tot) => L.push('<tr class="wk"><td colspan="5">' + tit + ' · ' + qtd + '</td><td class="r">' + tot + '</td></tr>');
+      const linha = (d, desc, antes, agora, ef) => L.push('<tr><td>' + d + '</td><td>' + desc + '</td><td class="r mut">' + antes + '</td><td class="r">' + agora + '</td><td></td><td class="r">' + ef + '</td></tr>');
+      const fz = (x) => esc(String(x.c.forn || '').replace(/ · direto na DRE$/, ''));
+      if (cont.novo.length) { grp('Contas novas', cont.novo.length, sg(sv(cont.novo.filter((x) => x.st !== 'O'), (x) => x.v))); cont.novo.sort((a, b) => a.d.localeCompare(b.d)).forEach((x) => linha(dm(x.d), fz(x) + (x.st === 'O' ? ' <em>oficina não recebida · não soma</em>' : x.st === 'P' ? ' <em class="tg ok">pago</em>' : ''), '—', n(x.v), x.st === 'O' ? '–' : sg(x.v))); }
+      if (cont.valor.length) { grp('Mudaram de valor', cont.valor.length, sg(sv(cont.valor.filter((y) => y.x.st !== 'O'), (y) => y.x.v - y.a[1]))); cont.valor.sort((a, b) => a.x.d.localeCompare(b.x.d)).forEach((y) => linha(dm(y.x.d), fz(y.x), n(y.a[1]), n(y.x.v), y.x.st === 'O' ? '–' : sg(y.x.v - y.a[1]))); }
+      if (cont.saiu.length) { grp('Saíram do período (excluídas ou mudaram de mês)', cont.saiu.length, sg(-sv(cont.saiu.filter((x) => x.a[2] !== 'O'), (x) => x.a[1]))); cont.saiu.sort((a, b) => a.a[0].localeCompare(b.a[0])).forEach((x) => linha(dm(fotoData(x.a[0])), esc(x.a[3] || x.k) + (x.a[2] === 'O' ? ' <em>oficina não recebida</em>' : ''), n(x.a[1]), esc(x.onde), x.a[2] === 'O' ? '–' : sg(-x.a[1]))); }
+      if (cont.receb.length) { grp('Oficinas recebidas (passaram a somar)', cont.receb.length, sg(sv(cont.receb, (x) => x.v))); cont.receb.forEach((x) => linha(dm(x.d), fz(x), 'não recebida', 'recebida · ' + n(x.v), sg(x.v))); }
+      if (cont.data.length) { grp('Mudaram de data dentro do período', cont.data.length, '–'); cont.data.sort((a, b) => a.x.d.localeCompare(b.x.d)).forEach((y) => linha(dm(y.x.d), fz(y.x), 'era ' + dm(fotoData(y.a[0])), 'agora ' + dm(y.x.d), '–')); }
+      if (cont.pago.length) { grp('Foram pagas desde o último PDF', cont.pago.length, n(sv(cont.pago, (x) => x.v))); cont.pago.sort((a, b) => a.d.localeCompare(b.d)).forEach((x) => { const a = ant.it[x.k]; linha(dm(x.d), fz(x), 'a pagar ' + dm(fotoData(a[0])), 'pago ' + dm(x.d) + ' · ' + n(x.v), '–'); }); }
+      const TH = '<table class="ls lsm"><thead><tr><th style="width:44px">Data</th><th style="width:auto">Descrição</th><th class="r" style="width:110px">Antes</th><th class="r" style="width:150px">Agora</th><th style="width:0"></th><th class="r" style="width:80px">Efeito</th></tr></thead><tbody>';
+      if (L.length) {
+        const pg0 = pages[pages.length - 1], R0 = Math.max(6, 22 - (pv.length ? pv.length + 3 : 0)), R = 34;
+        pg0.h += '<h2>Todas as mudanças</h2>' + TH + L.slice(0, R0).join('') + '</tbody></table>' + (L.length > R0 ? '<p class="sub">continua na próxima página</p>' : '');
+        for (let i = R0; i < L.length; i += R) pages.push({ t: 'O que mudou', h: '<h1 class="h1s">Todas as mudanças desde o último PDF · continuação</h1>' + TH + L.slice(i, i + R).join('') + '</tbody></table>' });
+      }
     }
     // ---------- previsões e semanas ----------
     const byKey = {};
