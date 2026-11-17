@@ -1914,25 +1914,31 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     }
     const pages = [];
     // ---------- página 1: resumo ----------
-    const max = Math.max(1, ...D.map((o) => Math.max(o.tot, antTot(o.m) || 0))), H = 170;
-    const bars = D.map((o) => { const a = o.pago / max * H, b = o.aberto / max * H, c = o.prev / max * H, at = antTot(o.m);
-      return '<div class="pc"><b>' + mi(o.tot).replace('R$ ', '') + '</b><div style="display:flex;align-items:flex-end;gap:5px">' +
-        (at != null ? '<div class="pcb" style="width:22px"><i style="height:' + (at / max * H).toFixed(1) + 'px;background:#D5DAE6"></i></div>' : '') +
-        '<div class="pcb"><i style="height:' + c.toFixed(1) + 'px;background:#F6E7B4;box-shadow:inset 0 0 0 1.5px #B8900F"></i><i style="height:' + b.toFixed(1) + 'px;background:#D3A512"></i><i style="height:' + a.toFixed(1) + 'px;background:#102574"></i></div></div><span>' + ms(o.m) + '</span></div>'; }).join('');
-    let p1 = '<h1>Previsão de saídas — ' + periodo + '</h1><p class="sub">MRBL · emitido em ' + dmy(HOJE) + ' às ' + agora().slice(11, 16) + ' por ' + esc(S.user) + (dreAte ? ' · DRE lançada até ' + dm(dreAte) : '') + (ant ? ' · comparado com o último PDF baixado (' + esc(antQuando) + ')' : ' · primeiro PDF: as próximas versões vão marcar o que mudou a partir deste') + '</p>';
     const tAnt = ant ? sel.reduce((a, m) => a + (antTot(m) || 0), 0) : null;
-    p1 += '<div class="kp" style="grid-template-columns:repeat(5,1fr)">' +
-      (ant ? '<div><span>Último PDF</span><b>' + mi(tAnt) + '</b><small>' + esc(dmy(ant.em)) + ' · ' + esc(ant.por) + '</small></div>' : '') +
-      '<div class="d"><span>Total do período</span><b>' + mi(tT) + '</b><small>' + (ant ? (tT - tAnt >= 0 ? '+' : '−') + mi(Math.abs(tT - tAnt)).replace('R$ ', 'R$ ') + ' vs último PDF' : 'pago + a pagar + previsão') + '</small></div>' +
-      '<div><span>Pago</span><b>' + mi(tP) + '</b><small>' + (tT ? Math.round(tP / tT * 100) : 0) + '% do período</small></div><div><span>A pagar · lançado</span><b>' + mi(tA) + '</b><small>contas já lançadas</small></div><div><span>Previsão · estimativa</span><b>' + mi(tV) + '</b><small>ainda sem conta lançada</small></div></div>';
-    p1 += '<div class="two" style="grid-template-columns:' + (ant ? '0.75fr 1.5fr' : '1fr 1.15fr') + '"><div><h2>Por mês</h2><div class="lg">' + (ant ? '<i style="background:#D5DAE6"></i>Último PDF ' : '') + '<i style="background:#102574"></i>Pago <i style="background:#D3A512"></i>A pagar <i style="background:#F6E7B4;box-shadow:inset 0 0 0 1.5px #B8900F"></i>Previsão</div><div class="pch" style="height:215px">' + bars + '</div></div>';
-    p1 += '<div><h2>Mês a mês (R$)</h2><table><thead><tr><th>Mês</th><th class="r">Pago</th><th class="r">A pagar</th><th class="r">Previsão</th><th class="r">Total</th>' + (ant ? '<th class="r">Último PDF</th><th class="r">Dif.</th>' : '') + '</tr></thead><tbody>' +
+    const max = Math.max(1, ...D.map((o) => Math.max(o.tot, antTot(o.m) || 0)));
+    const pc = (v) => (v / max * 100).toFixed(2) + '%';
+    let p1 = '<h1>Previsão de saídas · ' + periodo + '</h1><p class="sub">MRBL · emitido em ' + dmy(HOJE) + ' às ' + agora().slice(11, 16) + ' por ' + esc(S.user) + (dreAte ? ' · DRE lançada até ' + dm(dreAte) : '') + '<br>' + (ant ? 'Comparado com o último PDF baixado, em ' + esc(antQuando) + '.' : 'Primeiro PDF: os próximos vão marcar o que mudou a partir deste.') + '</p>';
+    const cards = [
+      '<div class="d"><span>Total do período</span><b>' + mi(tT) + '</b><small>' + (ant ? (tT - tAnt >= 0 ? '+' : '−') + mi(Math.abs(tT - tAnt)) + ' desde o último PDF' : 'pago + a pagar + previsão') + '</small></div>',
+      '<div><span>Pago</span><b>' + mi(tP) + '</b><small>' + (tT ? Math.round(tP / tT * 100) : 0) + '% do período</small></div>',
+      '<div><span>A pagar</span><b>' + mi(tA) + '</b><small>contas lançadas</small></div>',
+      '<div><span>Previsão</span><b>' + mi(tV) + '</b><small>estimativa sem conta</small></div>'];
+    if (ant) cards.push('<div class="an"><span>Último PDF</span><b>' + mi(tAnt) + '</b><small>' + esc(dmy(ant.em)) + ' · ' + esc(ant.por) + '</small></div>');
+    p1 += '<div class="kp" style="grid-template-columns:1.25fr repeat(' + (cards.length - 1) + ',1fr)">' + cards.join('') + '</div>';
+    // régua por mês: barra empilhada pago / a pagar / previsão, com a marca do último PDF
+    p1 += '<h2>Por mês</h2><div class="lg"><i style="background:#102574"></i>Pago <i style="background:#D3A512"></i>A pagar <i class="pv"></i>Previsão' + (ant ? ' <i class="tk"></i>Total no último PDF' : '') + '</div><div class="ru">' +
+      D.map((o) => { const at = antTot(o.m); return '<div class="rul"><span class="rum">' + ms(o.m) + '</span><div class="rut"><i style="width:' + pc(o.pago) + ';background:#102574"></i><i style="width:' + pc(o.aberto) + ';background:#D3A512"></i><i class="pv" style="width:' + pc(o.prev) + '"></i>' + (at != null ? '<u style="left:' + pc(at) + '"></u>' : '') + '</div><b>' + mi(o.tot) + '</b><small>' + (at != null ? (Math.abs(o.tot - at) < 0.005 ? 'igual ao último PDF' : sg(o.tot - at) + ' desde o último PDF') : '') + '</small></div>'; }).join('') + '</div>';
+    p1 += '<table class="mm"><thead><tr><th>Mês</th><th class="r">Pago</th><th class="r">A pagar</th><th class="r">Previsão</th><th class="r">Total</th>' + (ant ? '<th class="r">Último PDF</th><th class="r">Diferença</th>' : '') + '</tr></thead><tbody>' +
       D.map((o) => '<tr><td>' + ml(o.m) + '</td><td class="r">' + n(o.pago) + '</td><td class="r">' + n(o.aberto) + '</td><td class="r">' + n(o.prev) + '</td><td class="r"><b>' + n(o.tot) + '</b></td>' + (ant ? '<td class="r mut">' + (antTot(o.m) != null ? n(antTot(o.m)) : '—') + '</td><td class="r">' + (antTot(o.m) != null ? sg(o.tot - antTot(o.m)) : '—') + '</td>' : '') + '</tr>').join('') +
-      '</tbody><tfoot><tr><td>Total</td><td class="r">' + n(tP) + '</td><td class="r">' + n(tA) + '</td><td class="r">' + n(tV) + '</td><td class="r">' + n(tT) + '</td>' + (ant ? '<td class="r">' + n(tAnt) + '</td><td class="r">' + sg(tT - tAnt) + '</td>' : '') + '</tr></tfoot></table></div></div>';
+      '</tbody><tfoot><tr><td>Total</td><td class="r">' + n(tP) + '</td><td class="r">' + n(tA) + '</td><td class="r">' + n(tV) + '</td><td class="r">' + n(tT) + '</td>' + (ant ? '<td class="r">' + n(tAnt) + '</td><td class="r">' + sg(tT - tAnt) + '</td>' : '') + '</tr></tfoot></table>';
     const cats = {}; D.forEach((o) => Object.keys(o.cats).forEach((k) => { const c = o.cats[k], r = cats[k] = cats[k] || { pago: 0, aberto: 0, prev: 0 }; r.pago += c.pago; r.aberto += c.aberto; r.prev += c.prev; }));
     const ck = Object.keys(cats).sort((a, b) => (cats[b].pago + cats[b].aberto + cats[b].prev) - (cats[a].pago + cats[a].aberto + cats[a].prev));
     const cmax = Math.max(1, ...ck.map((k) => cats[k].pago + cats[k].aberto + cats[k].prev));
-    p1 += '<h2>Por categoria (R$)</h2><table class="cat"><thead><tr><th>Categoria</th><th class="r">Pago</th><th class="r">A pagar</th><th class="r">Previsão</th><th class="r">Total</th><th style="width:90px"></th></tr></thead><tbody>' + ck.slice(0, 18).map((k) => { const r = cats[k], t = r.pago + r.aberto + r.prev; return '<tr><td>' + esc(cap(k.toLowerCase())) + '</td><td class="r">' + n(r.pago) + '</td><td class="r">' + n(r.aberto) + '</td><td class="r">' + n(r.prev) + '</td><td class="r"><b>' + n(t) + '</b></td><td><span class="wb"><i style="width:' + (t / cmax * 100).toFixed(1) + '%"></i></span></td></tr>'; }).join('') + '</tbody></table>';
+    const cw = (v) => (v / cmax * 100).toFixed(2) + '%';
+    const NC = 16, resto = ck.slice(NC).reduce((a, k) => { const r = cats[k]; a.pago += r.pago; a.aberto += r.aberto; a.prev += r.prev; return a; }, { pago: 0, aberto: 0, prev: 0 });
+    const crow = (nome, r) => { const t = r.pago + r.aberto + r.prev; return '<tr><td>' + nome + '</td><td class="r">' + n(r.pago) + '</td><td class="r">' + n(r.aberto) + '</td><td class="r">' + n(r.prev) + '</td><td class="r"><b>' + n(t) + '</b></td><td><span class="cb"><i style="width:' + cw(r.pago) + ';background:#102574"></i><i style="width:' + cw(r.aberto) + ';background:#D3A512"></i><i class="pv" style="width:' + cw(r.prev) + '"></i></span></td></tr>'; };
+    p1 += '<h2>Por categoria (R$)</h2><table class="cat"><thead><tr><th>Categoria</th><th class="r">Pago</th><th class="r">A pagar</th><th class="r">Previsão</th><th class="r">Total</th><th style="width:120px"></th></tr></thead><tbody>' +
+      ck.slice(0, NC).map((k) => crow(esc(cap(k.toLowerCase())), cats[k])).join('') + (ck.length > NC ? crow('Outras ' + (ck.length - NC) + ' categorias', resto) : '') + '</tbody></table>';
     pages.push({ t: 'Resumo', h: p1 });
     // ---------- página 2: o que mudou desde o último PDF ----------
     if (ant) {
@@ -1989,10 +1995,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       W.push({ A, B, p: its.filter((x) => x.st === 'P').reduce((s, x) => s + x.v, 0), ab: its.filter((x) => x.st === 'A').reduce((s, x) => s + x.v, 0), es, cur: A <= HOJE && HOJE <= B }); dd.setDate(dd.getDate() + 7); }
     let acc = 0;
     p2 += '<h2>Por semana (R$) · segunda a domingo</h2><table><thead><tr><th>Semana</th><th class="r">Pago</th><th class="r">A pagar</th><th class="r">Previsão diluída</th><th class="r">Total</th><th class="r">Acumulado</th></tr></thead><tbody>' +
-      W.map((w) => { const t = w.p + w.ab + w.es; acc += t; return '<tr' + (w.cur ? ' style="background:#FFF7DD"' : '') + '><td>' + dm(w.A) + ' a ' + dm(w.B) + (w.cur ? ' · atual' : '') + '</td><td class="r">' + (w.p ? n(w.p) : '–') + '</td><td class="r">' + (w.ab ? n(w.ab) : '–') + '</td><td class="r">' + (w.es ? n(w.es) : '–') + '</td><td class="r"><b>' + n(t) + '</b></td><td class="r mut">' + n(acc) + '</td></tr>'; }).join('') + '</tbody></table>';
+      W.filter((w) => w.p + w.ab + w.es > 0.004).map((w) => { const t = w.p + w.ab + w.es; acc += t; return '<tr' + (w.cur ? ' style="background:#FFF7DD"' : '') + '><td>' + dm(w.A) + ' a ' + dm(w.B) + (w.cur ? ' · atual' : '') + '</td><td class="r">' + (w.p ? n(w.p) : '–') + '</td><td class="r">' + (w.ab ? n(w.ab) : '–') + '</td><td class="r">' + (w.es ? n(w.es) : '–') + '</td><td class="r"><b>' + n(t) + '</b></td><td class="r mut">' + n(acc) + '</td></tr>'; }).join('') + '</tbody></table>';
     pages.push({ t: 'Previsões e semanas', h: p2 });
     // ---------- listas por mês: pago e a pagar juntos, por semana (sábado a sexta) e dia ----------
-    const ROWS = 30;
     const satW = (d) => { const x = parse(d); x.setDate(x.getDate() - ((x.getDay() + 1) % 7)); const e = new Date(x); e.setDate(e.getDate() + 6); return [iso(x), iso(e)]; };
     const tag = (c, s) => ' <em class="tg ' + c + '">' + esc(s) + '</em>';
     sel.forEach((m) => {
@@ -2029,9 +2034,14 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
         ofs.forEach((x) => rows.push('<tr><td class="ck">☐</td><td>' + esc(x.c.forn) + ' <span class="mut">entrega prevista ' + dm(x.c.entrega) + '</span></td><td class="mut">pagamento previsto ' + dm(x.d) + '</td><td class="r">' + (ant ? (chg[x.k] ? chg[x.k].map((t) => '<em class="tg ' + t.c + '">' + esc(t.s) + '</em>').join(' ') : '<span class="mut">igual</span>') : '') + '</td><td class="r mut">' + n(x.v) + '</td></tr>'));
       }
       const titulo = 'Pagamentos · ' + ml(m) + ' ' + m.slice(0, 4);
-      for (let i = 0; i < rows.length; i += ROWS) {
-        pages.push({ t: titulo, h: '<h1 class="h1s">' + titulo + '</h1><p class="sub">✔ pago (data do pagamento) · ☐ a pagar (vencimento) · total ' + money(tot) + ', sendo ' + money(tp) + ' pago' + (ant ? ' · coluna "Desde o último PDF": igual, novo, pago, era …' : '') + (i ? ' · continuação' : '') + '</p><table class="ls lsm"><thead><tr><th style="width:14px"></th><th style="width:auto">Descrição</th><th style="width:170px">Subcategoria · categoria</th><th class="r" style="width:118px">' + (ant ? 'Desde o último PDF' : '') + '</th><th class="r" style="width:84px">Valor (R$)</th></tr></thead><tbody>' + rows.slice(i, i + ROWS).join('') + '</tbody></table>' });
-      }
+      // páginas pela altura estimada das linhas (descrição ou subcategoria longas quebram linha)
+      const peso = (r) => { if (r.indexOf('class="ck"') < 0) return 1.1; const tx = r.replace(/<[^>]+>/g, ' '); const sb = (r.match(/class="sb">([^<]*)/) || [])[1] || ''; const ds = (r.match(/<td class="ck">[^<]*<\/td><td>([^<]*)/) || [])[1] || ''; return 1.55 + (ds.length > 44 ? 0.8 : 0) + (sb.length > 30 ? 0.75 : 0) + (tx.length > 190 ? 0.4 : 0); };
+      const grupos = []; let atual = [], usado = 0; const CAP = 47;
+      rows.forEach((r) => { const w = peso(r); if (usado + w > CAP && atual.length) { grupos.push(atual); atual = []; usado = 0; } atual.push(r); usado += w; });
+      if (atual.length) grupos.push(atual);
+      grupos.forEach((pg, k) => {
+        pages.push({ t: titulo, h: '<h1 class="h1s">' + titulo + '</h1><p class="sub">✔ pago (data do pagamento) · ☐ a pagar (vencimento) · total ' + money(tot) + ', sendo ' + money(tp) + ' pago' + (ant ? ' · coluna "Desde o último PDF": igual, novo, pago, era …' : '') + (k ? ' · continuação' : '') + '</p><table class="ls lsm"><thead><tr><th style="width:14px"></th><th style="width:auto">Descrição</th><th style="width:170px">Subcategoria · categoria</th><th class="r" style="width:118px">' + (ant ? 'Desde o último PDF' : '') + '</th><th class="r" style="width:84px">Valor (R$)</th></tr></thead><tbody>' + pg.join('') + '</tbody></table>' });
+      });
     });
     const foto = relFotoDe(sel, D);
     return { pages, periodo, foto, file: 'MRBL_Previsao_Saidas_' + sel[0] + (sel.length > 1 ? '_a_' + sel[sel.length-1] : '') + '_' + HOJE.replace(/-/g, '') + '.pdf' };
