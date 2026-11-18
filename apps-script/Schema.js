@@ -11,6 +11,8 @@ var SCHEMA = {
   Fornecedores: ['id', 'nome', 'cat', 'sub'],
   Parcelamentos: ['id', 'nome', 'emp', 'cat', 'sub', 'valorParcela', 'qtd', 'valorTotal', 'pagasAntes', 'log', 'extra', 'criadoEm'],
   Cheques: ['id', 'data', 'numero', 'desc', 'cat', 'sub', 'valor', 'aPagar', 'grupo', 'contaId', 'log', 'extra', 'criadoEm'],
+  // saldo do extrato de cada banco no dia, digitado pelo financeiro na DRE mensal (id = data|banco)
+  SaldosBanco: ['id', 'data', 'banco', 'valor', 'em', 'por'],
   Clientes: ['nome'],
   Config: ['chave', 'valor'],
   Logs: ['em', 'por', 'tela', 'txt']
@@ -24,7 +26,7 @@ var CHAVES = { Usuarios: 'nome', Sessoes: 'token', Clientes: 'nome', Config: 'ch
 function chaveDe_(aba) { return Object.prototype.hasOwnProperty.call(CHAVES, aba) ? CHAVES[aba] : 'id'; }
 
 // Colunas guardadas como texto (datas aaaa-mm-dd e ids), para a planilha não converter.
-var COLUNAS_TEXTO = ['id', 'data', 'orig', 'pagoEm', 'dreId', 'entrega', 'recebidoEm', 'criadoEm', 'contaId', 'em', 'mes', 'token', 'nf', 'convite', 'forn', 'nome', 'cli', 'obs', 'chave', 'numero'];
+var COLUNAS_TEXTO = ['id', 'data', 'orig', 'pagoEm', 'dreId', 'entrega', 'recebidoEm', 'criadoEm', 'contaId', 'em', 'mes', 'token', 'nf', 'convite', 'forn', 'nome', 'cli', 'obs', 'chave', 'numero', 'banco', 'por'];
 // Colunas com listas ou objetos, guardadas como JSON.
 var COLUNAS_JSON = ['hist', 'histEnt', 'log', 'subs', 'extra'];
 

@@ -36,7 +36,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   const CFG = dados.config || {};
   let S = {
     contas: dados.contas || [], saidas: dados.saidas || [], entradas: dados.entradas || [], previsoes: dados.previsoes || [],
-    fornecedores: dados.fornecedores || [], parcelamentos: dados.parcelamentos || [], cheques: dados.cheques || [], prazoOf: CFG.prazoOficinas == null ? 15 : +CFG.prazoOficinas,
+    fornecedores: dados.fornecedores || [], parcelamentos: dados.parcelamentos || [], cheques: dados.cheques || [], saldosBanco: (dados.saldosBanco || []).map((x) => Object.assign(x, { valor: +x.valor || 0 })), prazoOf: CFG.prazoOficinas == null ? 15 : +CFG.prazoOficinas,
     ofFixas: Array.isArray(CFG.oficinasFixas) ? CFG.oficinasFixas : ['RAUL CALDERON'],
     prevReview: CFG.prevRevisao && typeof CFG.prevRevisao === 'object' ? CFG.prevRevisao : {},
     usuarios: (dados.usuarios || []).map((u) => u.nome), senhas: Object.fromEntries((dados.usuarios || []).map((u) => [u.nome, !!u.temSenha])),
@@ -1388,6 +1388,11 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
 
   // ---------- DRE ----------
   const EXCL_ENT = ['RECEBIMENTO MRBL', 'RECEBIMENTO STOFFA'];
+  // Saldo do extrato de cada banco no dia (aba SaldosBanco, uma linha por data|banco). Banco sem valor no dia conta como 0.
+  const BANCOS = ['SICREDI', 'ITAU', 'SANTANDER', 'SANTANDER RESG', 'SICREDI STOFFA', 'SANTANDER STOFFA'];
+  const sbDe = (d, b) => S.saldosBanco.find((x) => x.id === d + '|' + b);
+  const totBanco = (d) => { const l = S.saldosBanco.filter((x) => x.data === d); return l.length ? Math.round(l.reduce((t, x) => t + x.valor, 0) * 100) / 100 : null; };
+  const ultimoSaldo = (mk) => { const ds = [...new Set(S.saldosBanco.filter((x) => x.data.slice(0,7) === mk).map((x) => x.data))].sort(); return ds.length ? { d: ds[ds.length-1], v: totBanco(ds[ds.length-1]) } : null; };
   const DRE_MESES = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10','2026-11','2026-12'];
   // janeiro a junho: valores consolidados da aba DRE 2026 da planilha V2_12 (aba DreHistorico)
   const DRE_HIST = (() => {
@@ -1455,7 +1460,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const ini = D.ini[mi];
     const saldo = []; dias.forEach((_, i) => { saldo[i] = (i ? saldo[i-1] : ini) + totE[i] - totD[i]; });
     const sIni = dias.map((_, i) => i ? saldo[i-1] : ini);
-    h += '<div class="drescroll"><table class="rel dre dmes"><thead><tr><th>' + mesNome(mk) + '</th>' + dias.map((d, i) => { const w = new Date(yy, mm-1, i+1).getDay(); return '<th class="r"' + (i === hoje ? ' style="background:var(--navy);color:#fff"' : (w === 0 || w === 6 ? ' style="color:var(--muted)"' : '')) + '>' + (i+1) + '<br><small style="font-weight:400">' + sem[w] + '</small></th>'; }).join('') + '<th class="r">Total do mês</th></tr></thead><tbody>';
+    h += '<div class="drescroll dmscroll"><table class="rel dre dmes"><thead><tr><th>' + mesNome(mk) + '</th>' + dias.map((d, i) => { const w = new Date(yy, mm-1, i+1).getDay(); return '<th class="r"' + (i === hoje ? ' style="background:var(--navy);color:#fff"' : (w === 0 || w === 6 ? ' style="color:var(--muted)"' : '')) + '>' + (i+1) + '<br><small style="font-weight:400">' + sem[w] + '</small></th>'; }).join('') + '<th class="r">Total do mês</th></tr></thead><tbody>';
     h += sec('DESPESAS');
     const ordem = Object.keys(LISTAS).filter((k) => cats[k]).concat(Object.keys(cats).filter((k) => !(k in LISTAS)));
     ordem.forEach((k) => {
@@ -1476,9 +1481,46 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     h += row('Resultado do dia', totE.map((v, i) => v - totD[i]), 'subrow');
     h += row('Saldo inicial banco', sIni, 'subrow', '', false);
     h += row('Saldo bancário', saldo, 'totrow', 'font-weight:800', false);
+    sbCalc = { dias, saldo };
+    const fmtIn = (v) => v == null ? '' : (v < 0 ? '-' : '') + num(Math.abs(v));
+    h += sec('SALDO NOS BANCOS <small style="font-weight:400;letter-spacing:0;color:var(--muted)">· digite o saldo do extrato de cada banco no dia (vazio conta como 0)</small>');
+    BANCOS.forEach((b) => {
+      h += '<tr class="subrow sbrow"><td>' + esc(b) + '</td>' + dias.map((d, i) => { const x = sbDe(d, b);
+        return '<td class="sbc' + (i === hoje ? ' hj' : '') + '">' + (d > HOJE ? '' : '<input class="sbi num" inputmode="decimal" data-sb="' + d + '|' + esc(b) + '" value="' + fmtIn(x && x.valor) + '" aria-label="Saldo ' + esc(b) + ' em ' + dm(d) + '" placeholder="·">') + '</td>'; }).join('') + '<td></td></tr>';
+    });
+    h += '<tr class="totrow"><td style="font-weight:800">Total nos bancos</td>' + dias.map((d, i) => '<td class="r num" id="sbt' + i + '"' + (i === hoje ? ' style="background:var(--blue-soft)"' : '') + '></td>').join('') + '<td></td></tr>';
+    h += '<tr class="subrow"><td>Diferença <small style="color:var(--muted)">(bancos − saldo bancário calculado)</small></td>' + dias.map((d, i) => '<td class="r num" id="sbd' + i + '"' + (i === hoje ? ' style="background:var(--blue-soft)"' : '') + '></td>').join('') + '<td></td></tr>';
     h += '</tbody></table></div><div class="hint"><span>Mesmo desenho das abas mensais da planilha DRE: despesas por categoria e subcategoria, entradas por tipo e o saldo bancário dia a dia. Saldo inicial do mês = resultado acumulado até o fim do mês anterior (' + (ini < 0 ? '−' : '') + money(Math.abs(ini)) + '). Recebimento MRBL e STOFFA aparecem, mas não somam nas entradas.</span></div></section>';
     return h;
   }
+  // saldo nos bancos: grava ao sair da célula, sem redesenhar (o foco segue para a próxima célula)
+  let sbCalc = null;
+  function sbAtualiza(){
+    if (!sbCalc) return;
+    sbCalc.dias.forEach((d, i) => { const t = totBanco(d), a = document.getElementById('sbt' + i), b = document.getElementById('sbd' + i); if (!a) return;
+      a.textContent = t == null ? '' : (t < 0 ? '−' : '') + num(Math.abs(t));
+      const df = t == null ? null : Math.round((t - sbCalc.saldo[i]) * 100) / 100;
+      b.textContent = df == null ? '' : Math.abs(df) < 1 ? 'ok' : (df < 0 ? '−' : '+') + num(Math.abs(df));
+      b.style.color = df == null ? '' : Math.abs(df) < 1 ? 'var(--ok-ink)' : 'var(--danger-ink)'; b.style.fontWeight = df != null && Math.abs(df) >= 1 ? '700' : ''; });
+  }
+  document.addEventListener('change', (e) => {
+    const el = e.target; if (!el.matches || !el.matches('input.sbi')) return;
+    const [d, b] = el.dataset.sb.split('|'); const x = sbDe(d, b), txt = el.value.trim();
+    let msg;
+    if (!txt) { if (!x) return; S.saldosBanco = S.saldosBanco.filter((y) => y !== x); msg = 'Saldo ' + b + ' em ' + dm(d) + ' apagado'; }
+    else { const v = parseVal(txt); if (isNaN(v)) { el.value = x ? num(x.valor) : ''; toast('Valor inválido: ' + txt, false); return; }
+      if (x && x.valor === v) { el.value = (v < 0 ? '-' : '') + num(Math.abs(v)); return; }
+      if (x) x.valor = v; else S.saldosBanco.push({ id: d + '|' + b, data: d, banco: b, valor: v });
+      el.value = (v < 0 ? '-' : '') + num(Math.abs(v)); msg = 'Saldo ' + b + ' em ' + dm(d) + ': ' + money(v); }
+    (S.logs = S.logs || []).unshift({ em: agora(), por: S.user, txt: msg, tela: view.tela });
+    msgPendente = msg; save(); sbAtualiza();
+  });
+  document.addEventListener('keydown', (e) => {
+    const el = e.target; if (e.key !== 'Enter' || !el.matches || !el.matches('input.sbi')) return;
+    e.preventDefault(); const [d] = el.dataset.sb.split('|');
+    const same = [...document.querySelectorAll('input.sbi')].filter((x) => x.dataset.sb.startsWith(d + '|')); const nx = same[same.indexOf(el) + 1];
+    if (nx) { nx.focus(); nx.select(); } else el.blur();
+  });
   function renderDre(){
     const app = document.getElementById('app');
     const D = dreData();
@@ -1490,7 +1532,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     let h = '<section class="today"><h1>DRE</h1><span class="sub">Regime de caixa: entradas recebidas e contas pagas, no mês do pagamento. Recebimento MRBL e Recebimento STOFFA ficam de fora.</span></section>';
     h += '<section class="panel"><div class="ph"><div style="color:var(--muted);font-size:14px">Só lançamentos consolidados da DRE. Contas a pagar não entram aqui.</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" data-dre="modo:anual" style="' + seg(view.dreModo !== 'mensal') + '">Visão anual</button><button type="button" data-dre="modo:mensal" style="' + seg(view.dreModo === 'mensal') + '">Visão mensal</button><button type="button" class="btn sm" data-tela="drel">Ver lançamentos</button></div></div>';
-    if (view.dreModo === 'mensal') { h += dreMensalHTML(D, sumA); app.innerHTML = h; return; }
+    if (view.dreModo === 'mensal') { sbCalc = null; h += dreMensalHTML(D, sumA); app.innerHTML = h; sbAtualiza(); return; }
     const parcial = (k) => k === HOJE.slice(0,7) ? ' (parcial)' : '';
     const fat = D.recCat['RECEBIMENTO DE CLIENTE'] || DRE_MESES.map(() => 0);
     const fm = Math.max(1, ...fat);
@@ -1520,6 +1562,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     });
     h += line('Lucro líquido', D.lucro, 'totrow');
     h += line('Resultado com saldo inicial', D.fim, 'totrow', null, false);
+    h += '<tr class="subrow"><td>Saldo nos bancos <small style="color:var(--muted)">(último dia informado)</small></td>' + DRE_MESES.map((k) => { const u = ultimoSaldo(k); return u ? '<td class="r num" title="Informado em ' + dm(u.d) + '">' + (u.v < 0 ? '−' : '') + num(Math.abs(u.v)) + '<br><small style="color:var(--muted);font-weight:400">' + dm(u.d) + '</small></td>' : '<td></td>'; }).join('') + '<td></td></tr>';
     h += '</tbody></table></div><div class="hint"><span>De julho em diante, despesas e recebimentos vêm de DRE lançamentos (BASE_DESPESAS e BASE_ENTRADAS da planilha V2_12); janeiro a junho vêm consolidados da aba DRE 2026, porque a base começa em julho. O faturamento da planilha do Cesar é lançado lá à mão. Saldo inicial de janeiro: ' + money(DRE_HIST.saldoJan) + ' e de julho: ' + money(+(CFG.saldoJul || 0)) + ', como na planilha.</span></div></section>';
     h += '<div class="foot"><span id="copyOut"></span></div>';
     app.innerHTML = h;

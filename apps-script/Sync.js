@@ -1,6 +1,6 @@
 // Sincronização das telas com a planilha.
 // As telas carregam tudo ao entrar (dados.carregar) e, a cada ação, mandam só o que mudou (sync.aplicar).
-var ABAS_APP = { Contas: 'contas', Despesas: 'saidas', Entradas: 'entradas', Previsoes: 'previsoes', Fornecedores: 'fornecedores', Clientes: 'clientes', Parcelamentos: 'parcelamentos', Cheques: 'cheques' };
+var ABAS_APP = { Contas: 'contas', Despesas: 'saidas', Entradas: 'entradas', Previsoes: 'previsoes', Fornecedores: 'fornecedores', Clientes: 'clientes', Parcelamentos: 'parcelamentos', Cheques: 'cheques', SaldosBanco: 'saldosBanco' };
 var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto'];
 
 var Sync = {
@@ -75,6 +75,7 @@ var Sync = {
             if (aba === 'Entradas' && r.cli) novosClientes[String(r.cli).trim()] = true;
           }
           if (aba === 'Parcelamentos' || aba === 'Cheques') r.criadoEm = antes ? antes.criadoEm : agora;
+          if (aba === 'SaldosBanco') { r.em = agora; r.por = sess.usuario; }
           if (aba === 'Contas') { r.criadoEm = antes ? antes.criadoEm : agora; r.criadoPor = antes ? antes.criadoPor : sess.usuario; }
           return r;
         });
