@@ -1337,9 +1337,23 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (!view.repSel || !view.repSel.length || !view.repSel.every((m) => months.includes(m))) view.repSel = months.slice();
     const sel = months.filter((m) => view.repSel.includes(m));
     const D = months.map(repMonth), DS = D.filter((o) => sel.includes(o.m));
+    const ml = (m) => cap(mesNome(m)).slice(0,3) + (m.slice(0,4) !== CUR.slice(0,4) ? '/' + m.slice(2,4) : '');
+    // visão por semana (sábado a sexta, cortada no mês): contas pela data; a previsão a lançar do mês vai em partes iguais para as semanas que ainda não acabaram
+    const gran = view.relGran || 'mes';
+    const repWeeksOf = (m) => { const [y, mo] = m.split('-').map(Number), nd = new Date(y, mo, 0).getDate(), ws = [];
+      for (let d = 1; d <= nd; d++) { const ds = m + '-' + pad(d), w = weekOf(ds); let x = ws.find((z) => z.w === w); if (!x) ws.push(x = { w, a: ds, b: ds }); x.b = ds; } return ws; };
+    const wkData = (Dm, x, share) => {
+      const o = { key: Dm.m + '|' + x.a, m: Dm.m, label: dm(x.a) + (x.a !== x.b ? '–' + dm(x.b) : ''), cur: x.a <= HOJE && HOJE <= x.b, pago: 0, aberto: 0, prev: 0, cats: {} };
+      Object.keys(Dm.cats).forEach((cat) => { const C = Dm.cats[cat]; Object.keys(C.subs).forEach((sk) => { const s2 = C.subs[sk];
+        const add = (k, v, it) => { if (!v) return; const c = o.cats[cat] = o.cats[cat] || { pago: 0, aberto: 0, prev: 0, subs: {} }; c[k] += v; const t = c.subs[sk] = c.subs[sk] || { pago: 0, aberto: 0, prev: 0, itens: [] }; t[k] += v; o[k] += v; if (it) t.itens.push(it); };
+        (s2.itens || []).forEach((it) => { const d = it.k === 'pago' ? (it.c.pagoEm || it.c.data) : it.c.data; if (d >= x.a && d <= x.b) add(it.k, it.c.valor, it); });
+        if (s2.prev && share) add('prev', s2.prev * share); }); });
+      o.tot = o.pago + o.aberto + o.prev; return o; };
+    const W = gran === 'sem' ? DS.flatMap((Dm) => { const ws = repWeeksOf(Dm.m), fut = ws.filter((x) => x.b >= HOJE), alvo = fut.length ? fut : [ws[ws.length-1]]; return ws.map((x) => wkData(Dm, x, alvo.includes(x) ? 1 / alvo.length : 0)); }) : [];
+    const COLS = gran === 'sem' ? W : DS.map((o) => Object.assign({}, o, { key: o.m, label: ml(o.m), cur: o.m === CUR }));
+    const CH = gran === 'sem' ? W : D;
     const val = view.relVal || 'all';
     const pick = (x) => val === 'pago' ? x.pago : val === 'prev' ? x.aberto + x.prev : x.pago + x.aberto + x.prev;
-    const ml = (m) => cap(mesNome(m)).slice(0,3) + (m.slice(0,4) !== CUR.slice(0,4) ? '/' + m.slice(2,4) : '');
     let h = '<div class="today"><h1>Relatório</h1><span class="sub">Custo por mês: o que já foi pago e o que ainda está previsto pagar.</span></div>';
     // KPIs
     const tP = sum(DS.map((o) => ({ valor: o.pago }))), tA = sum(DS.map((o) => ({ valor: o.aberto }))), tV = sum(DS.map((o) => ({ valor: o.prev })));
@@ -1352,29 +1366,29 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       '<div class="kpi"><span>Total do recorte</span><b class="num">' + money(tP + tA + tV) + '</b><small>pago + previsto</small></div>' +
       '<div class="kpi d"><span>Falta pagar até dezembro</span><b class="num">' + money(falta) + '</b><small>' + cap(mesNome(CUR)) + ' a dezembro · ano todo ' + money(pagoAno + falta) + '</small></div></div>';
     // gráfico + recorte
-    const max = Math.max(1, ...D.map((o) => o.tot)), H = 190;
+    const max = Math.max(1, ...CH.map((o) => o.tot)), H = 190;
     const px = (v) => v > 0 ? Math.max(3, v / max * H).toFixed(1) + 'px' : '0';
     h += '<section class="panel"><div class="ph"><div class="mnav">' + (REP_FIXO ? '<h2>' + cap(mesNome(months[0])) + ' e ' + mesNome(months[months.length-1]) + ' ' + months[0].slice(0,4) + '</h2>' : '<button type="button" class="nav" data-rwin="-1" aria-label="Mês anterior">‹</button><h2 style="min-width:240px;text-align:center">' + cap(mesNome(months[0])) + ' a ' + mesNome(months[5]) + ' ' + months[5].slice(0,4) + '</h2><button type="button" class="nav" data-rwin="1" aria-label="Próximo mês">›</button>' + (view.repWin !== mAdd(CUR, -1) ? '<button type="button" class="btn sm" data-rwin="0">Voltar para hoje</button>' : '')) + '</div>' +
-      '<div class="rsel"><span class="lbl">Meses no recorte</span><div class="mtog" role="group" aria-label="Meses no recorte">' + months.map((m) => '<button type="button" data-rsel="' + m + '" aria-pressed="' + sel.includes(m) + '"><i aria-hidden="true"></i>' + ml(m) + '</button>').join('') + '</div><button type="button" class="mall" data-rsel="all"' + (sel.length === months.length ? ' disabled' : '') + '>Todos</button></div></div>';
+      '<div class="rsel"><div class="seg sm" role="tablist" aria-label="Ver por">' + [['mes','Mês'],['sem','Semana']].map(([k, t]) => '<button type="button" role="tab" data-rgran="' + k + '" aria-selected="' + (gran === k) + '">' + t + '</button>').join('') + '</div><span class="lbl">Meses no recorte</span><div class="mtog" role="group" aria-label="Meses no recorte">' + months.map((m) => '<button type="button" data-rsel="' + m + '" aria-pressed="' + sel.includes(m) + '"><i aria-hidden="true"></i>' + ml(m) + '</button>').join('') + '</div><button type="button" class="mall" data-rsel="all"' + (sel.length === months.length ? ' disabled' : '') + '>Todos</button></div></div>';
     const hp = (v) => v > 0 ? Math.max(3, v / max * H) : 0;
-    h += '<div class="rchart"' + (months.length <= 3 ? ' style="justify-content:center;gap:160px"' : '') + '>' + D.map((o) => { const a = hp(o.pago), b = hp(o.aberto), c = hp(o.prev);
+    h += '<div class="rchart' + (gran === 'sem' ? ' wk' : '') + '"' + (gran === 'mes' && months.length <= 3 ? ' style="justify-content:center;gap:160px"' : '') + '>' + CH.map((o) => { const a = hp(o.pago), b = hp(o.aberto), c = hp(o.prev);
       const lp = a / 2 - 9, la = Math.max(a ? lp + 19 : 0, a + b / 2 - 9), lv = Math.max(b ? la + 19 : (a ? lp + 19 : 0), a + b + c / 2 - 9);
-      return '<button type="button" class="rcol' + (sel.includes(o.m) ? ' on' : '') + (o.m === CUR ? ' cur' : '') + '" data-rsel="' + o.m + '" title="' + cap(mesNome(o.m)) + ': pago ' + money(o.pago) + ' · a pagar lançado ' + money(o.aberto) + ' · previsão ' + money(o.prev) + '">' +
+      return '<button type="button" class="rcol' + (gran === 'sem' ? ' on' + (o.cur ? ' cur' : '') + '" tabindex="-1" title="Semana ' + o.label : (sel.includes(o.m) ? ' on' : '') + (o.m === CUR ? ' cur' : '') + '" data-rsel="' + o.m + '" title="' + cap(mesNome(o.m))) + ': pago ' + money(o.pago) + ' · a pagar lançado ' + money(o.aberto) + ' · previsão ' + money(o.prev) + '">' +
       '<span class="rtot num">' + (o.tot ? short(o.tot) : '—') + '</span><span class="rplot" style="height:' + H + 'px"><span class="rbar"><i class="rpv" style="height:' + c.toFixed(1) + 'px"></i><i class="ra" style="height:' + b.toFixed(1) + 'px"></i><i class="rp" style="height:' + a.toFixed(1) + 'px"></i></span>' +
       '<span class="rlabs">' + (o.pago ? '<em class="p num" style="bottom:' + Math.max(0, lp).toFixed(0) + 'px">' + short(o.pago) + '</em>' : '') + (o.aberto ? '<em class="a num" style="bottom:' + Math.max(0, la).toFixed(0) + 'px">' + short(o.aberto) + '</em>' : '') + (o.prev ? '<em class="v num" style="bottom:' + Math.max(0, lv).toFixed(0) + 'px">' + short(o.prev) + '</em>' : '') + '</span></span>' +
-      '<span class="rlab">' + ml(o.m) + (o.m === CUR ? ' · atual' : '') + '</span></button>'; }).join('') + '</div>';
+      '<span class="rlab">' + (gran === 'sem' ? o.label + (o.cur ? ' · atual' : '') : ml(o.m) + (o.m === CUR ? ' · atual' : '')) + '</span></button>'; }).join('') + '</div>';
     h += '<div class="legend"><span><i style="background:var(--blue)"></i>Pago</span><span><i style="background:var(--yellow)"></i>A pagar · contas lançadas</span><span><i style="background:#F6E7B4;border:1.5px dashed #B8900F"></i>Previsão pela média histórica · ainda sem conta</span><span>Clique num mês para tirar ou pôr no recorte.</span></div></section>';
     // tabela
     const cats = {};
-    DS.forEach((o, i) => Object.keys(o.cats).forEach((k) => { const c = o.cats[k]; const r = cats[k] = cats[k] || { v: sel.map(() => 0), subs: {} }; const ix = sel.indexOf(o.m); r.v[ix] += pick(c); Object.keys(c.subs).forEach((sk) => { const sv = r.subs[sk] = r.subs[sk] || sel.map(() => 0); sv[ix] += pick(c.subs[sk]); (r.itens = r.itens || {}); (r.itens[sk] = r.itens[sk] || []).push(...(c.subs[sk].itens || []).filter((it) => val === 'all' || (val === 'pago') === (it.k === 'pago')).map((it) => Object.assign({ ix }, it))); }); }));
+    COLS.forEach((o, ix) => Object.keys(o.cats).forEach((k) => { const c = o.cats[k]; const r = cats[k] = cats[k] || { v: COLS.map(() => 0), subs: {} }; r.v[ix] += pick(c); Object.keys(c.subs).forEach((sk) => { const sv = r.subs[sk] = r.subs[sk] || COLS.map(() => 0); sv[ix] += pick(c.subs[sk]); (r.itens = r.itens || {}); (r.itens[sk] = r.itens[sk] || []).push(...(c.subs[sk].itens || []).filter((it) => val === 'all' || (val === 'pago') === (it.k === 'pago')).map((it) => Object.assign({ ix }, it))); }); }));
     const keys = Object.keys(cats).filter((k) => cats[k].v.some((x) => x)).sort((a, b) => sum(cats[b].v.map((v) => ({ valor: v }))) - sum(cats[a].v.map((v) => ({ valor: v }))));
     const tot = (arr) => arr.reduce((a, b) => a + b, 0);
-    const colTot = sel.map((_, i) => keys.reduce((a, k) => a + cats[k].v[i], 0)), grand = tot(colTot);
+    const colTot = COLS.map((_, i) => keys.reduce((a, k) => a + cats[k].v[i], 0)), grand = tot(colTot);
     const maxCell = Math.max(1, ...keys.flatMap((k) => cats[k].v)), maxRow = Math.max(1, ...keys.map((k) => tot(cats[k].v)));
     const heat = (v) => { if (!v) return ''; const t = Math.pow(v / maxCell, 0.6); return 'background:rgba(211,165,18,' + (0.06 + 0.5 * t).toFixed(3) + ')' + (t > 0.7 ? ';font-weight:700' : ''); };
     h += '<section class="panel"><div class="ph"><h2>Por categoria</h2><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="seg sm" role="tablist">' + [['all','Pago + previsto'],['pago','Só pago'],['prev','Só previsto']].map(([k, t]) => '<button type="button" role="tab" data-rval="' + k + '" aria-selected="' + (val === k) + '">' + t + '</button>').join('') + '</div><button type="button" class="btn sm" data-rel="open:all">Abrir todas</button><button type="button" class="btn sm" data-rel="open:none">Fechar todas</button></div></div>';
-    h += '<div class="scroll"><table class="rel rep"><thead><tr><th style="min-width:280px">Categoria</th>' + sel.map((m) => '<th class="r' + (m === CUR ? ' cur' : '') + '">' + ml(m) + '</th>').join('') + '<th class="r">Total</th><th style="width:150px">Peso no recorte</th></tr></thead><tbody>';
-    if (!keys.length) h += '<tr><td colspan="' + (sel.length + 3) + '" class="empty">Nada neste recorte.</td></tr>';
+    h += '<div class="scroll"><table class="rel rep"><thead><tr><th style="min-width:280px">Categoria</th>' + COLS.map((o) => '<th class="r' + (o.cur ? ' cur' : '') + '">' + o.label + '</th>').join('') + '<th class="r">Total</th><th style="width:150px">Peso no recorte</th></tr></thead><tbody>';
+    if (!keys.length) h += '<tr><td colspan="' + (COLS.length + 3) + '" class="empty">Nada neste recorte.</td></tr>';
     keys.forEach((k) => { const r = cats[k], t = tot(r.v), open = view.relOpen[k];
       const catAtr = Object.values(r.itens || {}).flat().filter((it) => it.k === 'aberto' && it.c.data < HOJE);
       h += '<tr class="catrow"><td><button type="button" data-rel="tog:' + esc(k) + '" class="rtog">' + (open ? '▾ ' : '▸ ') + esc(k) + '</button>' + (catAtr.length ? ' <i class="rit at" title="Contas vencidas e ainda não pagas">' + catAtr.length + (catAtr.length === 1 ? ' atrasada · ' : ' atrasadas · ') + num(catAtr.reduce((t, it) => t + it.c.valor, 0)) + '</i>' : '') + '</td>' + r.v.map((v) => '<td class="r num" style="' + heat(v) + '">' + (v ? num(v) : '') + '</td>').join('') +
@@ -1387,7 +1401,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       // contas da subcategoria: a pagar primeiro (atrasadas no topo), depois as pagas, por data
       if (so) its.slice().sort((x, y) => (x.k === 'pago') - (y.k === 'pago') || (x.k === 'pago' ? (x.c.pagoEm || x.c.data) : x.c.data).localeCompare(y.k === 'pago' ? (y.c.pagoEm || y.c.data) : y.c.data)).forEach((it) => { const c = it.c, pg = it.k === 'pago', d = pg ? (c.pagoEm || c.data) : c.data, atr = !pg && d < HOJE;
         const tag = pg ? '<i class="rit rpg">pago ' + dm(d) + '</i>' : atr ? '<i class="rit at">atrasada · ' + dm(d) + '</i>' : '<i class="rit ab">a pagar · ' + dm(d) + '</i>';
-        h += '<tr class="ritrow' + (pg ? ' rpg' : '') + '"><td><div class="ritl">' + tag + '<span>' + esc(c.forn || '—') + (!S.contas.includes(c) ? ' <small>(lançada direto na DRE)</small>' : '') + '</span></div></td>' + sel.map((_, ix) => '<td class="r num">' + (ix === it.ix ? num(c.valor) : '') + '</td>').join('') + '<td></td><td></td></tr>'; });
+        h += '<tr class="ritrow' + (pg ? ' rpg' : '') + '"><td><div class="ritl">' + tag + '<span>' + esc(c.forn || '—') + '' + '</span></div></td>' + COLS.map((_, ix) => '<td class="r num">' + (ix === it.ix ? num(c.valor) : '') + '</td>').join('') + '<td></td><td></td></tr>'; });
     });
     });
     h += '<tr class="totrow"><td>Total</td>' + colTot.map((v) => '<td class="r num">' + num(v) + '</td>').join('') + '<td class="r num">' + num(grand) + '</td><td></td></tr>';
@@ -1808,6 +1822,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const rw = e.target.closest('[data-rwin]'); if (rw) { const n = +rw.dataset.rwin; view.repWin = n === 0 ? mAdd(CUR, -1) : mAdd(view.repWin || mAdd(CUR, -1), n); view.repSel = null; render(); return; }
     const rs = e.target.closest('[data-rsel]'); if (rs) { const m = rs.dataset.rsel; if (m === 'all') view.repSel = null; else { const cur = view.repSel || []; const allOn = cur.length === repMonths().length; view.repSel = allOn ? [m] : cur.includes(m) ? cur.filter((x) => x !== m) : cur.concat(m); if (!view.repSel.length) view.repSel = null; } render(); return; }
     const rv = e.target.closest('[data-rval]'); if (rv) { view.relVal = rv.dataset.rval; render(); return; }
+    const rg = e.target.closest('[data-rgran]'); if (rg) { view.relGran = rg.dataset.rgran; render(); return; }
     const rb = e.target.closest('[data-rel]');
     if (rb) { const [k, v] = rb.dataset.rel.split(/:(.*)/s);
       if (k === 'vis') view.relVis = v;
