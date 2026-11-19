@@ -1321,8 +1321,8 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   // dados do relatório mensal: pago, a pagar (lançado) e previsão ainda não lançada
   function repMonth(m){
     const o = { m, pago: 0, aberto: 0, prev: 0, cats: {} };
-    const add = (cat, sub, k, v) => { if (!v) return; cat = cat || 'Sem categoria'; sub = sub || '—'; const c = o.cats[cat] = o.cats[cat] || { pago: 0, aberto: 0, prev: 0, subs: {} }; c[k] += v; const s2 = c.subs[sub] = c.subs[sub] || { pago: 0, aberto: 0, prev: 0 }; s2[k] += v; o[k] += v; };
-    S.contas.filter(naPagar).concat(dreAvulsas()).forEach((c) => { if (c.pago) { if ((c.pagoEm || c.data).slice(0,7) === m) add(c.cat, c.sub, 'pago', c.valor); } else if (c.data.slice(0,7) === m) add(c.cat, c.sub, 'aberto', c.valor); });
+    const add = (cat, sub, k, v, conta) => { if (!v) return; cat = cat || 'Sem categoria'; sub = sub || '—'; const c = o.cats[cat] = o.cats[cat] || { pago: 0, aberto: 0, prev: 0, subs: {} }; c[k] += v; const s2 = c.subs[sub] = c.subs[sub] || { pago: 0, aberto: 0, prev: 0, itens: [] }; s2[k] += v; o[k] += v; if (conta) s2.itens.push({ c: conta, k }); };
+    S.contas.filter(naPagar).concat(dreAvulsas()).forEach((c) => { if (c.pago) { if ((c.pagoEm || c.data).slice(0,7) === m) add(c.cat, c.sub, 'pago', c.valor, c); } else if (c.data.slice(0,7) === m) add(c.cat, c.sub, 'aberto', c.valor, c); });
     const LP = lancPrev(m);
     if (m >= CUR) prevsOf(m).forEach((p) => { const l = sum(LP.filter((c) => matchPrev(p, c))); add(p.cat, (p.subs.length === 1 ? p.subs[0] : p.nome) + ' · previsão', 'prev', Math.max(0, p.valor - l)); });
     o.tot = o.pago + o.aberto + o.prev; return o;
@@ -1365,7 +1365,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     h += '<div class="legend"><span><i style="background:var(--blue)"></i>Pago</span><span><i style="background:var(--yellow)"></i>A pagar · contas lançadas</span><span><i style="background:#F6E7B4;border:1.5px dashed #B8900F"></i>Previsão pela média histórica · ainda sem conta</span><span>Clique num mês para tirar ou pôr no recorte.</span></div></section>';
     // tabela
     const cats = {};
-    DS.forEach((o, i) => Object.keys(o.cats).forEach((k) => { const c = o.cats[k]; const r = cats[k] = cats[k] || { v: sel.map(() => 0), subs: {} }; const ix = sel.indexOf(o.m); r.v[ix] += pick(c); Object.keys(c.subs).forEach((sk) => { const sv = r.subs[sk] = r.subs[sk] || sel.map(() => 0); sv[ix] += pick(c.subs[sk]); }); }));
+    DS.forEach((o, i) => Object.keys(o.cats).forEach((k) => { const c = o.cats[k]; const r = cats[k] = cats[k] || { v: sel.map(() => 0), subs: {} }; const ix = sel.indexOf(o.m); r.v[ix] += pick(c); Object.keys(c.subs).forEach((sk) => { const sv = r.subs[sk] = r.subs[sk] || sel.map(() => 0); sv[ix] += pick(c.subs[sk]); (r.itens = r.itens || {}); (r.itens[sk] = r.itens[sk] || []).push(...(c.subs[sk].itens || []).filter((it) => val === 'all' || (val === 'pago') === (it.k === 'pago')).map((it) => Object.assign({ ix }, it))); }); }));
     const keys = Object.keys(cats).filter((k) => cats[k].v.some((x) => x)).sort((a, b) => sum(cats[b].v.map((v) => ({ valor: v }))) - sum(cats[a].v.map((v) => ({ valor: v }))));
     const tot = (arr) => arr.reduce((a, b) => a + b, 0);
     const colTot = sel.map((_, i) => keys.reduce((a, k) => a + cats[k].v[i], 0)), grand = tot(colTot);
@@ -1378,7 +1378,14 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       h += '<tr class="catrow"><td><button type="button" data-rel="tog:' + esc(k) + '" class="rtog">' + (open ? '▾ ' : '▸ ') + esc(k) + '</button></td>' + r.v.map((v) => '<td class="r num" style="' + heat(v) + '">' + (v ? num(v) : '') + '</td>').join('') +
         '<td class="r num" style="font-weight:700">' + num(t) + '</td><td><span class="wbar"><i style="width:' + (t / maxRow * 100).toFixed(1) + '%"></i></span><small class="num">' + (grand ? (t / grand * 100).toFixed(1).replace('.', ',') : '0') + '%</small></td></tr>';
       if (open) Object.keys(r.subs).filter((sk) => r.subs[sk].some((x) => x)).sort((a, b) => tot(r.subs[b]) - tot(r.subs[a])).forEach((sk) => { const sv = r.subs[sk];
-        h += '<tr class="subrow"><td style="padding-left:28px;color:var(--muted)">' + (/ · previsão$/.test(sk) ? '<i class="pvtag">previsão</i> ' + esc(sk.replace(/ · previsão$/, '')) : esc(sk)) + '</td>' + sv.map((v) => '<td class="r num" style="color:var(--muted)">' + (v ? num(v) : '') + '</td>').join('') + '<td class="r num" style="color:var(--muted)">' + num(tot(sv)) + '</td><td></td></tr>'; });
+        const its = (r.itens && r.itens[sk]) || [], ok = k + '|' + sk, so = view.relOpen[ok];
+      const lab = / · previsão$/.test(sk) ? '<i class="pvtag">previsão</i> ' + esc(sk.replace(/ · previsão$/, '')) : esc(sk);
+      h += '<tr class="subrow"><td style="padding-left:28px;color:var(--muted)">' + (its.length ? '<button type="button" data-rel="tog:' + esc(ok) + '" class="rtog rsub" title="' + (so ? 'Esconder' : 'Ver') + ' as contas">' + (so ? '▾ ' : '▸ ') + lab + ' <small>' + its.length + (its.length === 1 ? ' conta' : ' contas') + '</small></button>' : lab) + '</td>' + sv.map((v) => '<td class="r num" style="color:var(--muted)">' + (v ? num(v) : '') + '</td>').join('') + '<td class="r num" style="color:var(--muted)">' + num(tot(sv)) + '</td><td></td></tr>';
+      // contas da subcategoria: a pagar primeiro (atrasadas no topo), depois as pagas, por data
+      if (so) its.slice().sort((x, y) => (x.k === 'pago') - (y.k === 'pago') || (x.k === 'pago' ? (x.c.pagoEm || x.c.data) : x.c.data).localeCompare(y.k === 'pago' ? (y.c.pagoEm || y.c.data) : y.c.data)).forEach((it) => { const c = it.c, pg = it.k === 'pago', d = pg ? (c.pagoEm || c.data) : c.data, atr = !pg && d < HOJE;
+        const tag = pg ? '<i class="rit pg">pago ' + dm(d) + '</i>' : atr ? '<i class="rit at">atrasada · ' + dm(d) + '</i>' : '<i class="rit ab">a pagar · ' + dm(d) + '</i>';
+        h += '<tr class="ritrow' + (pg ? ' pg' : '') + '"><td><div class="ritl">' + tag + '<span>' + esc(c.forn || '—') + (!S.contas.includes(c) ? ' <small>(lançada direto na DRE)</small>' : '') + '</span></div></td>' + sel.map((_, ix) => '<td class="r num">' + (ix === it.ix ? num(c.valor) : '') + '</td>').join('') + '<td></td><td></td></tr>'; });
+    });
     });
     h += '<tr class="totrow"><td>Total</td>' + colTot.map((v) => '<td class="r num">' + num(v) + '</td>').join('') + '<td class="r num">' + num(grand) + '</td><td></td></tr>';
     h += '</tbody></table></div><div class="hint"><span>Pago pela data do pagamento; a pagar pela data de vencimento atual. "Previsão" é a estimativa pela média histórica que ainda não virou conta: o valor da previsão do mês menos o que já foi lançado (Configurações › Previsões). Quanto mais forte o amarelo, maior o valor.</span></div></section>';

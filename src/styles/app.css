@@ -461,3 +461,11 @@ table.dmes thead th:first-child{z-index:6;background:linear-gradient(var(--blue-
 table.dmes td.sbc{padding:1px 2px}table.dmes td.sbc.hj{background:var(--blue-soft)}table.dmes tr.sbrow td:first-child{padding-left:24px;font-size:12px;font-weight:600}
 input.sbi{width:100%;min-width:74px;box-sizing:border-box;font:inherit;font-size:12.5px;text-align:right;border:1px solid transparent;border-radius:6px;background:rgba(127,127,127,.06);color:var(--ink);padding:4px 6px}
 input.sbi::placeholder{color:var(--muted);opacity:.5}input.sbi:hover{border-color:var(--ctrl)}input.sbi:focus{outline:2px solid var(--navy);outline-offset:-1px;background:var(--surface)}
+
+/* Relatório: contas dentro da subcategoria */
+.rtog.rsub{font-weight:600;color:var(--muted);padding:2px 0}.rtog.rsub small{font-weight:400;opacity:.8;margin-left:4px}
+tr.ritrow td{padding-top:3px;padding-bottom:3px;font-size:12.5px;border-top:1px dashed var(--line)}
+tr.ritrow td:first-child{padding-left:48px}.ritl{display:flex;gap:8px;align-items:baseline}.ritl span{overflow-wrap:anywhere}
+tr.ritrow.pg td{color:var(--muted)}
+.rit{font-style:normal;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;white-space:nowrap;flex:none}
+.rit.ab{background:var(--gold-soft);color:#8a6100}.rit.at{background:var(--danger-soft,#fde3e1);color:var(--danger-ink)}.rit.pg{background:var(--blue-soft);color:var(--navy)}
