@@ -1348,7 +1348,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const pagoAno = S.contas.filter((c) => c.pago && (c.pagoEm || c.data).slice(0,4) === CUR.slice(0,4)).reduce((a, c) => a + c.valor, 0);
     const atrL = S.contas.filter((c) => naPagar(c) && !c.pago && c.data < HOJE), atrN = atrL.length, atrTot = atrL.reduce((t, c) => t + c.valor, 0);
     h += '<div class="kpis"><div class="kpi"><span>Pago</span><b class="num">' + money(tP) + '</b><small>' + (sel.length === months.length ? (REP_FIXO ? 'em ' + months.map((m) => mesNome(m)).join(' e ') : 'nos 6 meses') : sel.map(ml).join(', ')) + '</small></div>' +
-      '<div class="kpi g"><span>Previsto pagar</span><b class="num">' + money(tA + tV) + '</b><small>' + money(tA) + ' lançado · ' + money(tV) + ' de previsão a lançar' + (atrTot ? '<br><b style="color:var(--danger-ink)">' + money(atrTot) + ' atrasado (' + atrN + ' conta' + (atrN === 1 ? '' : 's') + ')</b>' : '') + '</small></div>' +
+      '<div class="kpi g"><span>Previsto pagar</span><b class="num">' + money(tA + tV) + '</b><small>' + money(tA) + ' lançado · ' + money(tV) + ' de previsão a lançar</small>' + (atrTot ? '<em class="katr" title="Contas vencidas e ainda não pagas"><i aria-hidden="true"></i>' + atrN + (atrN === 1 ? ' atrasada' : ' atrasadas') + '<u class="num">' + money(atrTot) + '</u></em>' : '') + '</div>' +
       '<div class="kpi"><span>Total do recorte</span><b class="num">' + money(tP + tA + tV) + '</b><small>pago + previsto</small></div>' +
       '<div class="kpi d"><span>Falta pagar até dezembro</span><b class="num">' + money(falta) + '</b><small>' + cap(mesNome(CUR)) + ' a dezembro · ano todo ' + money(pagoAno + falta) + '</small></div></div>';
     // gráfico + recorte

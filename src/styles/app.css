@@ -469,3 +469,8 @@ tr.ritrow td:first-child{padding-left:48px}.ritl{display:flex;gap:8px;align-item
 tr.ritrow.rpg td{color:var(--muted)}
 .rit{font-style:normal;font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;white-space:nowrap;flex:none}
 .rit.ab{background:var(--gold-soft);color:#8a6100}.rit.at{background:var(--danger-soft,#fde3e1);color:var(--danger-ink)}.rit.rpg{background:var(--blue-soft);color:var(--navy)}
+
+/* KPI: aviso discreto de contas atrasadas */
+.kpi em.katr{display:flex;align-items:center;gap:7px;margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);font-style:normal;font-size:12px;font-weight:600;color:var(--danger-ink);white-space:nowrap}
+.kpi em.katr i{width:7px;height:7px;border-radius:50%;background:var(--danger);flex:none}
+.kpi em.katr u{text-decoration:none;margin-left:auto;font-weight:700;font-size:12.5px;white-space:nowrap}
