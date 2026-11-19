@@ -1346,8 +1346,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const fimAno = CUR.slice(0,4) + '-12'; const resto = []; for (let m = CUR; m <= fimAno; m = mAdd(m, 1)) resto.push(repMonth(m));
     const falta = resto.reduce((a, o) => a + o.aberto + o.prev, 0);
     const pagoAno = S.contas.filter((c) => c.pago && (c.pagoEm || c.data).slice(0,4) === CUR.slice(0,4)).reduce((a, c) => a + c.valor, 0);
+    const atrL = S.contas.filter((c) => naPagar(c) && !c.pago && c.data < HOJE), atrN = atrL.length, atrTot = atrL.reduce((t, c) => t + c.valor, 0);
     h += '<div class="kpis"><div class="kpi"><span>Pago</span><b class="num">' + money(tP) + '</b><small>' + (sel.length === months.length ? (REP_FIXO ? 'em ' + months.map((m) => mesNome(m)).join(' e ') : 'nos 6 meses') : sel.map(ml).join(', ')) + '</small></div>' +
-      '<div class="kpi g"><span>Previsto pagar</span><b class="num">' + money(tA + tV) + '</b><small>' + money(tA) + ' lançado · ' + money(tV) + ' de previsão a lançar</small></div>' +
+      '<div class="kpi g"><span>Previsto pagar</span><b class="num">' + money(tA + tV) + '</b><small>' + money(tA) + ' lançado · ' + money(tV) + ' de previsão a lançar' + (atrTot ? '<br><b style="color:var(--danger-ink)">' + money(atrTot) + ' atrasado (' + atrN + ' conta' + (atrN === 1 ? '' : 's') + ')</b>' : '') + '</small></div>' +
       '<div class="kpi"><span>Total do recorte</span><b class="num">' + money(tP + tA + tV) + '</b><small>pago + previsto</small></div>' +
       '<div class="kpi d"><span>Falta pagar até dezembro</span><b class="num">' + money(falta) + '</b><small>' + cap(mesNome(CUR)) + ' a dezembro · ano todo ' + money(pagoAno + falta) + '</small></div></div>';
     // gráfico + recorte
@@ -1375,11 +1376,13 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     h += '<div class="scroll"><table class="rel rep"><thead><tr><th style="min-width:280px">Categoria</th>' + sel.map((m) => '<th class="r' + (m === CUR ? ' cur' : '') + '">' + ml(m) + '</th>').join('') + '<th class="r">Total</th><th style="width:150px">Peso no recorte</th></tr></thead><tbody>';
     if (!keys.length) h += '<tr><td colspan="' + (sel.length + 3) + '" class="empty">Nada neste recorte.</td></tr>';
     keys.forEach((k) => { const r = cats[k], t = tot(r.v), open = view.relOpen[k];
-      h += '<tr class="catrow"><td><button type="button" data-rel="tog:' + esc(k) + '" class="rtog">' + (open ? '▾ ' : '▸ ') + esc(k) + '</button></td>' + r.v.map((v) => '<td class="r num" style="' + heat(v) + '">' + (v ? num(v) : '') + '</td>').join('') +
+      const catAtr = Object.values(r.itens || {}).flat().filter((it) => it.k === 'aberto' && it.c.data < HOJE);
+      h += '<tr class="catrow"><td><button type="button" data-rel="tog:' + esc(k) + '" class="rtog">' + (open ? '▾ ' : '▸ ') + esc(k) + '</button>' + (catAtr.length ? ' <i class="rit at" title="Contas vencidas e ainda não pagas">' + catAtr.length + (catAtr.length === 1 ? ' atrasada · ' : ' atrasadas · ') + num(catAtr.reduce((t, it) => t + it.c.valor, 0)) + '</i>' : '') + '</td>' + r.v.map((v) => '<td class="r num" style="' + heat(v) + '">' + (v ? num(v) : '') + '</td>').join('') +
         '<td class="r num" style="font-weight:700">' + num(t) + '</td><td><span class="wbar"><i style="width:' + (t / maxRow * 100).toFixed(1) + '%"></i></span><small class="num">' + (grand ? (t / grand * 100).toFixed(1).replace('.', ',') : '0') + '%</small></td></tr>';
       if (open) Object.keys(r.subs).filter((sk) => r.subs[sk].some((x) => x)).sort((a, b) => tot(r.subs[b]) - tot(r.subs[a])).forEach((sk) => { const sv = r.subs[sk];
         const its = (r.itens && r.itens[sk]) || [], ok = k + '|' + sk, so = view.relOpen[ok];
-      const lab = / · previsão$/.test(sk) ? '<i class="pvtag">previsão</i> ' + esc(sk.replace(/ · previsão$/, '')) : esc(sk);
+      const atrs = its.filter((it) => it.k === 'aberto' && it.c.data < HOJE);
+      const lab = (/ · previsão$/.test(sk) ? '<i class="pvtag">previsão</i> ' + esc(sk.replace(/ · previsão$/, '')) : esc(sk)) + (atrs.length ? ' <i class="rit at">' + atrs.length + (atrs.length === 1 ? ' atrasada · ' : ' atrasadas · ') + num(atrs.reduce((t, it) => t + it.c.valor, 0)) + '</i>' : '');
       h += '<tr class="subrow"><td style="padding-left:28px;color:var(--muted)">' + (its.length ? '<button type="button" data-rel="tog:' + esc(ok) + '" class="rtog rsub" title="' + (so ? 'Esconder' : 'Ver') + ' as contas">' + (so ? '▾ ' : '▸ ') + lab + ' <small>' + its.length + (its.length === 1 ? ' conta' : ' contas') + '</small></button>' : lab) + '</td>' + sv.map((v) => '<td class="r num" style="color:var(--muted)">' + (v ? num(v) : '') + '</td>').join('') + '<td class="r num" style="color:var(--muted)">' + num(tot(sv)) + '</td><td></td></tr>';
       // contas da subcategoria: a pagar primeiro (atrasadas no topo), depois as pagas, por data
       if (so) its.slice().sort((x, y) => (x.k === 'pago') - (y.k === 'pago') || (x.k === 'pago' ? (x.c.pagoEm || x.c.data) : x.c.data).localeCompare(y.k === 'pago' ? (y.c.pagoEm || y.c.data) : y.c.data)).forEach((it) => { const c = it.c, pg = it.k === 'pago', d = pg ? (c.pagoEm || c.data) : c.data, atr = !pg && d < HOJE;
