@@ -481,3 +481,11 @@ tr.ritrow.rpg td{color:var(--muted)}
 .rchart.wk .rcol{flex:1 1 0;min-width:0;padding:8px 0;cursor:default}.rchart.wk .rcol:hover{background:none}
 .rchart.wk .rlab{font-size:11.5px;white-space:nowrap}.rchart.wk .rtot{font-size:12px}
 .rchart.wk .rlabs{display:none}.rchart.wk .rbar{width:min(46px,70%)}
+
+/* sem data definida */
+.sdp{margin-top:16px;border-top:4px solid var(--ctrl)}.sdp .ph{padding:12px}.sdnote{padding:0 12px 8px;color:var(--muted);font-size:13px}
+.sdrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:8px 12px;border-top:1px solid var(--line)}.sdrow .who b{display:block;font-weight:700}.sdrow .who span{color:var(--muted);font-size:13px}
+.sdrow .acts{grid-column:1/-1;display:flex;gap:6px}.sdfoot{padding:10px 12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
+@media (max-width:1640px){.sdrow{grid-template-columns:minmax(0,1fr) 140px auto;padding:8px 16px}.sdrow .acts{grid-column:auto;justify-content:flex-end}.sdp .ph,.sdnote,.sdfoot{padding-left:16px;padding-right:16px}}
+.sddist{margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--blue-soft)}.sddist b{display:block;color:var(--navy)}.sddist p{margin:2px 0 8px;font-size:13px;color:var(--muted)}
+.sdgrid{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-top:6px}.sdgrid .ff{display:flex;flex-direction:column;gap:3px;align-items:stretch}.sdgrid .ff input{width:170px}

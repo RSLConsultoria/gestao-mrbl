@@ -13,6 +13,8 @@ var SCHEMA = {
   Cheques: ['id', 'data', 'numero', 'desc', 'cat', 'sub', 'valor', 'aPagar', 'grupo', 'contaId', 'log', 'extra', 'criadoEm'],
   // saldo do extrato de cada banco no dia, digitado pelo financeiro na DRE mensal (id = data|banco)
   SaldosBanco: ['id', 'data', 'banco', 'valor', 'em', 'por'],
+  // contas a pagar ainda sem data: ficam fora de semanas, meses, Relatório e previsões até ganharem data ou virarem parcelamento
+  ContasSemData: ['id', 'forn', 'cat', 'sub', 'valor', 'obs', 'log', 'extra', 'criadoEm', 'criadoPor'],
   Clientes: ['nome'],
   Config: ['chave', 'valor'],
   Logs: ['em', 'por', 'tela', 'txt']

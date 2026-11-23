@@ -45,7 +45,7 @@ acao_('carga.importar', function (d, s) {
 
 // Apaga todos os dados do app para uma nova carga. Mantém usuários, sessões e configurações.
 // Só pelo editor do Apps Script (Executar), nunca pelo app.
-var ABAS_DADOS = ['Contas', 'Despesas', 'Entradas', 'DreHistorico', 'Previsoes', 'Fornecedores', 'Clientes', 'Parcelamentos', 'Cheques', 'SaldosBanco', 'Logs'];
+var ABAS_DADOS = ['Contas', 'Despesas', 'Entradas', 'DreHistorico', 'Previsoes', 'Fornecedores', 'Clientes', 'Parcelamentos', 'Cheques', 'SaldosBanco', 'ContasSemData', 'Logs'];
 function apagarDados() {
   var ss = SpreadsheetApp.getActive(), trava = LockService.getScriptLock();
   trava.waitLock(30000);

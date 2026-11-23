@@ -36,7 +36,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   const CFG = dados.config || {};
   let S = {
     contas: dados.contas || [], saidas: dados.saidas || [], entradas: dados.entradas || [], previsoes: dados.previsoes || [],
-    fornecedores: dados.fornecedores || [], parcelamentos: dados.parcelamentos || [], cheques: dados.cheques || [], saldosBanco: (dados.saldosBanco || []).map((x) => Object.assign(x, { valor: +x.valor || 0 })), prazoOf: CFG.prazoOficinas == null ? 15 : +CFG.prazoOficinas,
+    fornecedores: dados.fornecedores || [], parcelamentos: dados.parcelamentos || [], cheques: dados.cheques || [], semData: (dados.semData || []).map((x) => Object.assign(x, { valor: +x.valor || 0, log: x.log || [] })), saldosBanco: (dados.saldosBanco || []).map((x) => Object.assign(x, { valor: +x.valor || 0 })), prazoOf: CFG.prazoOficinas == null ? 15 : +CFG.prazoOficinas,
     ofFixas: Array.isArray(CFG.oficinasFixas) ? CFG.oficinasFixas : ['RAUL CALDERON'],
     prevReview: CFG.prevRevisao && typeof CFG.prevRevisao === 'object' ? CFG.prevRevisao : {},
     usuarios: (dados.usuarios || []).map((u) => u.nome), senhas: Object.fromEntries((dados.usuarios || []).map((u) => [u.nome, !!u.temSenha])),
@@ -217,11 +217,54 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     return null;
   };
   ['pointerdown','focusin','keydown'].forEach((ev) => document.addEventListener(ev, (e) => { const k = selFor(e.target); if (k) anchorSel = k; }, true));
+  // ---------- Contas a pagar sem data definida ----------
+  // Ficam fora de semanas, meses, Relatório e previsões até ganharem uma data ou virarem parcelamento.
+  const sdById = (id) => (S.semData || []).find((x) => x.id === id);
+  const sdLog = (x, txt) => (x.log = x.log || []).push({ txt, em: agora(), por: S.user });
+  function sdPanelHTML(){
+    const L = S.semData || [], tot = L.reduce((a, x) => a + x.valor, 0);
+    let h = '<section class="panel sdp" aria-labelledby="sdh"><div class="ph"><h2 id="sdh">Sem data definida · ' + L.length + '</h2><span class="num" style="font-weight:600">' + money(tot) + '</span></div>' +
+      '<div class="sdnote">Valores a pagar sem data. Não entram nas semanas, no mês, no Relatório nem nas previsões. Defina a data ou parcele.</div>';
+    const VIS = view.sdAll ? L : L.slice(0, 6);
+    VIS.forEach((x) => { h += '<div class="sdrow" data-sd="' + x.id + '"><div class="who"><button type="button" class="rowopen" data-sdopen="' + x.id + '"><b>' + esc(x.forn) + '</b></button><span>' + (x.sub ? esc(x.sub) : (x.cat ? esc(x.cat) : 'sem categoria')) + '</span></div>' +
+      '<div class="num" style="text-align:right;font-weight:600">' + num(x.valor) + '</div>' +
+      '<div class="acts"><button type="button" class="btn sm" data-sdgo="data:' + x.id + '">Definir data</button><button type="button" class="btn sm" data-sdgo="parc:' + x.id + '">Parcelar</button></div></div>'; });
+    if (!L.length) h += '<div class="sdnote" style="padding-bottom:12px">Nada aqui.</div>';
+    h += '<div class="sdfoot">' + (L.length > 6 ? '<button type="button" class="lnk" data-sdall>' + (view.sdAll ? 'Mostrar menos' : 'Mostrar todas (' + L.length + ')') + '</button>' : '<span></span>') + '<button type="button" class="lnk" data-sdnew>+ Adicionar conta sem data</button></div></section>';
+    return h;
+  }
+  function sdModalHTML(){
+    const f = view.sdf, x = f.id ? sdById(f.id) : null;
+    const fld = (lab, ctl) => '<label class="ff"><span>' + lab + '</span>' + ctl + '</label>';
+    const xBtn = '<button type="button" class="mx" data-modal-close aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+    const subSel = (() => { const o = subOpts(f.cat, f.sub); return f.sub && o.indexOf('>' + esc(f.sub) + '<') < 0 ? '<option selected>' + esc(f.sub) + '</option>' + o : o; })();
+    let h = '<div class="modal-bg" data-modal-bg><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="mh"><h2 id="mt">' + (x ? esc(x.forn) : 'Nova conta sem data') + '</h2>' + xBtn + '</div><div class="ebody"><div class="egrid"><div class="fbody">' +
+      fld('Fornecedor / descrição', '<input id="sdForn" value="' + esc(f.forn) + '" autocomplete="off">') +
+      fld('Categoria', '<select id="sdCat">' + catOpts(f.cat) + '</select>') + fld('Subcategoria', '<select id="sdSub">' + subSel + '</select>') +
+      fld('Valor', '<input id="sdVal" class="val" value="' + esc(f.valor) + '" inputmode="decimal" placeholder="0,00">') +
+      fld('Observação', '<textarea id="sdObs" rows="2" placeholder="Opcional">' + esc(f.obs || '') + '</textarea>');
+    if (x) {
+      h += '<div class="sddist"><b>Distribuir</b><p>Escolha quanto vai sair daqui. Se for menos que o total, o resto continua sem data.</p>' +
+        '<div class="sdgrid"><label class="ff"><span>Valor a distribuir</span><input id="sdPart" class="val" value="' + esc(f.part) + '" inputmode="decimal"></label>' +
+        '<div class="seg sm" role="tablist">' + [['data','Numa data'],['parc','Em parcelas']].map(([k, t]) => '<button type="button" role="tab" data-sdmode="' + k + '" aria-selected="' + (f.mode === k) + '">' + t + '</button>').join('') + '</div></div>' +
+        (f.mode === 'data' ? '<div class="sdgrid"><label class="ff"><span>Vencimento</span><input type="date" id="sdData" value="' + esc(f.data || '') + '"></label><button type="button" class="btn pri" id="sdLanca">Lançar em Contas a pagar</button></div>'
+          : '<div class="sdgrid"><p style="margin:0;font-size:13px;color:var(--muted)">Abre o parcelamento já com o nome, a categoria e o valor total. Ao salvar, as parcelas entram em Contas a pagar.</p><button type="button" class="btn pri" id="sdParc">Montar parcelamento</button></div>') + '</div>';
+    }
+    h += '</div>' + (x ? '<div class="tlbox"><h3>Linha do tempo</h3><div class="tlscroll"><ol class="tl">' + (x.log || []).slice().reverse().map((l, i, a) => '<li class="' + (i === a.length - 1 ? 'last' : '') + '"><b>' + esc(l.txt) + '</b><small>' + esc(l.por || '') + ' · ' + esc((l.em || '').replace('T', ' ')) + '</small></li>').join('') + '</ol></div></div>' : '') +
+      '</div></div><div class="efoot"><p class="err" id="modalErr" style="color:var(--danger-ink);margin:0 0 8px"></p><div class="fact">' +
+      (x ? (view.sdDel ? '<span>Excluir esta conta sem data?</span><button type="button" class="btn sm del" id="sdDelOk">Excluir</button><button type="button" class="btn sm" id="sdDelNo">Cancelar</button>' : '<button type="button" class="btn del ghost" id="sdDel">Excluir</button>') : '') +
+      '<span class="grow"></span><button type="button" class="btn y" id="sdSave">' + (x ? 'Salvar' : 'Adicionar') + '</button></div></div></div></div>';
+    return h;
+  }
+  function sdOpen(x, mode){ view.modal = 'sd'; view.sdDel = false; view.sdf = x ? { id: x.id, forn: x.forn, cat: x.cat || '', sub: x.sub || '', valor: num(x.valor), obs: x.obs || '', part: num(x.valor), mode: mode || 'data', data: '' } : { id: null, forn: '', cat: '', sub: '', valor: '', obs: '', part: '', mode: 'data', data: '' }; render(); }
+  // tira 'v' do item; se zerar, sai da lista
+  function sdBaixa(x, v, txt){ if (v >= x.valor - 0.004) { S.semData = S.semData.filter((y) => y !== x); } else { x.valor = Math.round((x.valor - v) * 100) / 100; sdLog(x, txt + ' · ficou ' + money(x.valor) + ' sem data'); } }
   function modalHTML(){
     if (!view.modal) return '';
     if (view.modal === 'pvimp') return pvImpHTML();
     if (view.modal === 'lanc') return lancModalHTML();
     if (view.modal === 'parcnew' || view.modal === 'parcedit') return parcModalHTML();
+    if (view.modal === 'sd') return sdModalHTML();
     if (view.modal === 'chqnew' || view.modal === 'chqedit') return chqModalHTML();
     const fld = (lab, ctl) => '<label class="ff"><span>' + lab + '</span>' + ctl + '</label>';
     if (view.modal === 'ofedit') {
@@ -407,7 +450,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       (S.parcelamentos = S.parcelamentos || []).push(p);
       r = gerarParcelas(p, f.primeiro, p.pagasAntes + 1);
       if (r.ligadas) logP(p, r.ligadas + ' parcela(s) que já estavam em Contas a pagar foram ligadas a este parcelamento');
+      if (view.sdFrom) { const x = sdById(view.sdFrom.id); if (x) { logP(p, 'Veio de Sem data definida: ' + x.forn + ' (' + money(view.sdFrom.v) + ')'); sdBaixa(x, view.sdFrom.v, 'Parcelado em ' + p.nome); } }
     });
+    const veioSd = !!view.sdFrom; view.sdFrom = null; if (veioSd) view.tela = 'pagar';
     view.modal = null; render();
     if (r && r.ligadas) toast(r.ligadas + ' parcela(s) já estavam em Contas a pagar e foram ligadas; ' + r.criadas + ' nova(s) criada(s).', true);
   }
@@ -636,6 +681,34 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (id === 'pcPrim') { view.pf.primeiro = e.target.value; const r = document.getElementById('pcResumo'); if (r) r.textContent = resumoPF(); }
     if (id === 'pcCat') { view.pf.cat = e.target.value; view.pf.sub = (LISTAS[view.pf.cat] || [])[0] || ''; render(); }
   });
+  document.addEventListener('input', (e) => { if (view.modal !== 'sd' || !view.sdf) return; const m = { sdForn: 'forn', sdVal: 'valor', sdObs: 'obs', sdPart: 'part' }; if (m[e.target.id]) view.sdf[m[e.target.id]] = e.target.value; });
+  document.addEventListener('change', (e) => { if (view.modal !== 'sd' || !view.sdf) return; const id = e.target.id;
+    if (id === 'sdData') view.sdf.data = e.target.value; if (id === 'sdSub') view.sdf.sub = e.target.value;
+    if (id === 'sdCat') { view.sdf.cat = e.target.value; view.sdf.sub = (LISTAS[view.sdf.cat] || [])[0] || ''; render(); } });
+  document.addEventListener('click', (e) => {
+    const t = e.target, f = view.sdf;
+    const so = t.closest('[data-sdopen]'); if (so) { e.stopPropagation(); const x = sdById(so.dataset.sdopen); if (x) sdOpen(x); return; }
+    const sg = t.closest('[data-sdgo]'); if (sg) { const [mode, id] = sg.dataset.sdgo.split(':'); const x = sdById(id); if (x) sdOpen(x, mode); setTimeout(() => { const i = document.getElementById(mode === 'data' ? 'sdData' : 'sdPart'); if (i) i.focus(); }, 30); return; }
+    if (t.closest('[data-sdall]')) { view.sdAll = !view.sdAll; render(); return; }
+    if (t.closest('[data-sdnew]')) { sdOpen(null); setTimeout(() => { const i = document.getElementById('sdForn'); if (i) i.focus(); }, 30); return; }
+    const sm = t.closest('[data-sdmode]'); if (sm && f) { f.mode = sm.dataset.sdmode; render(); return; }
+    if (view.modal !== 'sd' || !f) return;
+    const err = (m) => { const el = document.getElementById('modalErr'); if (el) el.textContent = m; };
+    const x = f.id ? sdById(f.id) : null;
+    if (t.id === 'sdSave') { const v = parseVal(f.valor); if (!f.forn.trim()) return err('Preencha o fornecedor ou a descrição.'); if (!(v > 0)) return err('Valor inválido.');
+      if (x) act(x.forn + ' (sem data) atualizada.', () => { const mud = []; if (x.forn !== f.forn.trim()) mud.push('nome'); if (x.valor !== v) mud.push('valor ' + money(x.valor) + ' → ' + money(v)); if (x.cat !== f.cat || x.sub !== f.sub) mud.push('categoria'); Object.assign(x, { forn: f.forn.trim(), cat: f.cat, sub: f.sub, valor: v }); if (f.obs !== (x.obs || '')) { x.obs = f.obs; if (f.obs) sdLog(x, 'Obs: ' + f.obs); } if (mud.length) sdLog(x, 'Editada: ' + mud.join(', ')); });
+      else act(f.forn.trim() + ' adicionada em Sem data definida.', () => { const n = { id: novoId('sd'), forn: f.forn.trim(), cat: f.cat, sub: f.sub, valor: v, obs: f.obs, log: [] }; sdLog(n, 'Criada sem data' + (f.obs ? ' · Obs: ' + f.obs : '')); S.semData.push(n); });
+      view.modal = null; render(); return; }
+    if (t.id === 'sdDel') { view.sdDel = true; render(); return; } if (t.id === 'sdDelNo') { view.sdDel = false; render(); return; }
+    if (t.id === 'sdDelOk' && x) { act(x.forn + ' excluída de Sem data definida.', () => { S.semData = S.semData.filter((y) => y !== x); }); view.modal = null; render(); return; }
+    if ((t.id === 'sdLanca' || t.id === 'sdParc') && x) { const v = parseVal(f.part);
+      if (!(v > 0)) return err('Informe o valor a distribuir.'); if (v > x.valor + 0.004) return err('O valor a distribuir passa do total (' + money(x.valor) + ').');
+      if (t.id === 'sdLanca') { if (!f.data) return err('Escolha a data de vencimento.');
+        act(x.forn + ': ' + money(v) + ' lançado em ' + dm(f.data) + ' (semana de ' + weekLabel(weekOf(f.data)) + ').', () => { const nova = { id: novoId('c'), data: f.data, orig: null, forn: x.forn, cat: x.cat, sub: x.sub, valor: v, pago: false, pagoEm: null, hist: [], log: [] };
+          if (typeof logC === 'function') logC(nova, 'Veio de Sem data definida' + (v < x.valor - 0.004 ? ' (' + money(v) + ' de ' + money(x.valor) + ')' : '')); S.contas.push(nova); sdBaixa(x, v, money(v) + ' lançado em ' + dm(f.data)); });
+        view.modal = null; render(); return; }
+      view.sdFrom = { id: x.id, v }; view.tela = 'parc'; view.modal = 'parcnew'; view.pf = Object.assign(blankPF(), { nome: x.forn, cat: x.cat, sub: x.sub, total: num(v), obs: 'Veio de Sem data definida' }); render(); return; }
+  }, true);
   document.addEventListener('click', (e) => {
     const t = e.target;
     const pf = t.closest('[data-pf]'); if (pf) { const [k, v] = pf.dataset.pf.split(':'); view[k] = v; render(); return; }
@@ -950,7 +1023,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     h += '<div class="legend"><span><i style="background:var(--blue)"></i>Pago</span><span><i style="border:1.5px solid var(--blue)"></i>A pagar</span><span><i style="background:var(--yellow)"></i>Prorrogado</span><span><i style="background:var(--danger)"></i>Vencido</span><span><i style="background:repeating-linear-gradient(135deg,var(--blue-2) 0 2px,transparent 2px 6px);border:1.5px dashed var(--blue)"></i>Previsão ainda não lançada, dividida pelas semanas que faltam</span><span>Clique numa barra para abrir a semana.</span></div></section>';
 
     // layout: mês em cima (largura total); vencidas à esquerda e semana à direita; previsões embaixo (scroll único)
-    h += '<div class="cols"><aside class="vcol">' + vencH + '</aside><div class="wcol">';
+    h += '<div class="cols"><aside class="vcol">' + vencH + sdPanelHTML() + '</aside><div class="wcol">';
     // semana
     const rows = CP.filter((c) => inWeek(c, view.week)).sort((a,b) => a.data.localeCompare(b.data) || a.forn.localeCompare(b.forn));
     const aberto = rows.filter((c) => !c.pago), pagas = rows.filter((c) => c.pago), npr = aberto.filter(isPror).length;
@@ -1790,7 +1863,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (cfd) { const id = cfd.closest('[data-fid]').dataset.fid; const f = S.fornecedores.find((x) => x.id === id); act(f.nome + ' removido da lista.', () => { S.fornecedores = S.fornecedores.filter((x) => x.id !== id); }); return; }
     if (e.target.closest('#btnPdf')) { gerarPdf(); return; }
     if (e.target.closest('#btnXls')) { if (view.tela === 'drel') exportarLancXlsx(); else exportarDreXlsx(); return; }
-    if (e.target.id === 'btnNew' && view.tela === 'parc') { view.modal = 'parcnew'; view.pf = blankPF(); render(); const f = document.getElementById('pcNome'); if (f) f.focus(); return; }
+    if (e.target.id === 'btnNew' && view.tela === 'parc') { view.sdFrom = null; view.modal = 'parcnew'; view.pf = blankPF(); render(); const f = document.getElementById('pcNome'); if (f) f.focus(); return; }
     if (e.target.id === 'btnNew') { view.modal = view.tela === 'of' ? 'of' : 'conta'; render(); const f = document.getElementById(view.modal === 'of' ? 'oForn' : 'nForn'); if (f) f.focus(); return; }
     if (e.target.closest('[data-modal-close]') || e.target.matches('[data-modal-bg]')) { view.modal = null; render(); return; }
     const gp = e.target.closest('[data-gopay]'); if (gp) { const c = byId(gp.dataset.gopay); if (c) goPay(c); return; }
