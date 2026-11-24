@@ -46,3 +46,12 @@ table.dmes tr.subrow td{padding-top:2px;padding-bottom:2px}
 .rep .rlin .rsemseta{cursor:default}
 .rep .rlin .pvtag{margin-left:2px}
 .rtog.rsub small{margin-left:4px}
+
+/* Fluxo de Caixa: escolha dos meses (visão anual) */
+.dresel{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:12px 16px 0}
+.dresel>span{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.dresel button{font:inherit;font-size:13px;font-weight:600;min-height:30px;padding:0 10px;border:1px solid var(--ctrl);background:var(--surface);color:var(--ink);border-radius:8px;cursor:pointer}
+.dresel button:hover{border-color:var(--navy)}
+.dresel button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.dresel .dresel-todos{margin-left:6px}
+.dresel small{flex-basis:100%;color:var(--muted);font-size:12px}

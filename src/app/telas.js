@@ -103,7 +103,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
 
   const blankD = () => ({ data: HOJE, cat: '', sub: '', emp: 'MRBL', valor: '', forn: '', resp: RESPS[RESPS.length-1] || '', obs: '', contaId: null });
   const blankE = () => ({ data: HOJE, cat: ECATS[0], cli: '', nf: '', valor: '', resp: RESPS[RESPS.length-1] || '', obs: '' });
-  const view = { cfgTab: 'listas', cfgQ: '', pvYear: 0, cfgCat: AC, newSub: '', modal: null, dForm: blankD(), eForm: blankE(), dStatus: '', eStatus: '', drelTab: 'sai', dreProj: false, dreOpen: {}, dreModo: 'anual', dreMes: '', dreOpenM: {}, dreAllM: true, drelMes: iso(TODAY).slice(0,7), relVis: 'semana', relMes: iso(TODAY).slice(0,7), relVal: 'all', relOpen: {}, prMes: (() => { const d = new Date(TODAY.getFullYear(), TODAY.getMonth()-1, 1); return d.getFullYear() + '-' + pad(d.getMonth()+1); })(), tela: 'pagar', ofWeek: iso(monday(TODAY)), receiving: null, week: iso(monday(TODAY)), addErr: '', paying: null, removing: null, proring: null, histOpen: null, newCat: CATS[0], pCat: AC };
+  const view = { cfgTab: 'listas', cfgQ: '', pvYear: 0, cfgCat: AC, newSub: '', modal: null, dForm: blankD(), eForm: blankE(), dStatus: '', eStatus: '', drelTab: 'sai', dreProj: false, dreOpen: {}, dreSel: [], dreSelUlt: '', dreModo: 'anual', dreMes: '', dreOpenM: {}, dreAllM: true, drelMes: iso(TODAY).slice(0,7), relVis: 'semana', relMes: iso(TODAY).slice(0,7), relVal: 'all', relOpen: {}, prMes: (() => { const d = new Date(TODAY.getFullYear(), TODAY.getMonth()-1, 1); return d.getFullYear() + '-' + pad(d.getMonth()+1); })(), tela: 'pagar', ofWeek: iso(monday(TODAY)), receiving: null, week: iso(monday(TODAY)), addErr: '', paying: null, removing: null, proring: null, histOpen: null, newCat: CATS[0], pCat: AC };
   if (converterFixos()) { msgPendente = 'Oficinas com pagamento fixo: contas ajustadas para a data do pagamento.'; save(); }
   let undoSnap = null, toastTimer = null;
   const snap = () => JSON.stringify(S);
@@ -1633,35 +1633,41 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       '<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" data-dre="modo:anual" style="' + seg(view.dreModo !== 'mensal') + '">Visão anual</button><button type="button" data-dre="modo:mensal" style="' + seg(view.dreModo === 'mensal') + '">Visão mensal</button><button type="button" class="btn sm" data-tela="drel">Ver lançamentos</button></div></div>';
     if (view.dreModo === 'mensal') { sbCalc = null; h += dreMensalHTML(D, sumA); app.innerHTML = h; sbAtualiza(); return; }
     const parcial = (k) => k === HOJE.slice(0,7) ? ' (parcial)' : '';
-    const fat = D.recCat['RECEBIMENTO DE CLIENTE'] || DRE_MESES.map(() => 0);
+    // meses escolhidos (vazio = ano todo): os cards, o gráfico e a tabela mostram só eles
+    const selK = DRE_MESES.filter((k) => !view.dreSel.length || view.dreSel.includes(k)), IX = selK.map((k) => DRE_MESES.indexOf(k)), todos = selK.length === DRE_MESES.length;
+    const pk = (a) => IX.map((i) => a[i]);
+    const per = todos ? '2026' : selK.length === 1 ? lab(selK[0]) : (IX[IX.length - 1] - IX[0] === IX.length - 1 ? lab(selK[0]) + ' a ' + lab(selK[selK.length - 1]) : selK.map(lab).join(', '));
+    const fatT = D.recCat['RECEBIMENTO DE CLIENTE'] || DRE_MESES.map(() => 0), fat = pk(fatT);
     const fm = Math.max(1, ...fat);
     const acc = []; fat.reduce((t, v, i) => (acc[i] = t + v), 0);
-    const despA = sumA(D.cmv) + sumA(D.frete) + sumA(D.opex), lucA = sumA(D.lucro);
+    const despA = sumA(pk(D.cmv)) + sumA(pk(D.frete)) + sumA(pk(D.opex)), lucA = sumA(pk(D.lucro));
     const comDado = fat.filter((v) => v > 0).length;
+    h += '<div class="dresel" role="group" aria-label="Meses"><span>Meses</span>' + DRE_MESES.map((k) => '<button type="button" data-dre="sel:' + k + '" aria-pressed="' + (!todos && view.dreSel.includes(k)) + '">' + lab(k) + '</button>').join('') +
+      '<button type="button" class="dresel-todos" data-dre="sel:todos" aria-pressed="' + todos + '">Ano todo</button><small>' + (todos ? 'Clique nos meses para ver só eles. Shift + clique escolhe um intervalo.' : 'Mostrando ' + per + '.') + '</small></div>';
     h += '<div class="kpis" style="padding:12px 16px 4px">' +
-      '<div class="kpi"><span>Faturamento acumulado 2026</span><b class="num">' + money(sumA(fat)) + '</b><small>janeiro a ' + mesNome(HOJE.slice(0,7)) + ' · média ' + money(comDado ? sumA(fat) / comDado : 0) + '/mês</small></div>' +
-      '<div class="kpi"><span>Recebimentos acumulados</span><b class="num">' + money(sumA(D.rec)) + '</b><small>faturamento + devoluções e outras entradas</small></div>' +
-      '<div class="kpi"><span>Despesas acumuladas</span><b class="num">' + money(despA) + '</b><small>CMV, frete e operacionais</small></div>' +
-      '<div class="kpi ' + (lucA < 0 ? 'd' : 'g') + '"><span>Lucro líquido acumulado</span><b class="num"' + (lucA < 0 ? ' style="color:var(--danger-ink)"' : '') + '>' + (lucA < 0 ? '−' : '') + money(Math.abs(lucA)) + '</b><small>recebimentos menos despesas</small></div></div>';
-    h += '<div style="padding:12px 16px 0;border-top:1px solid var(--line)"><h3 style="margin:0;font-size:15px">Faturamento mês a mês · 2026</h3><span style="color:var(--muted);font-size:13px">Recebimento de cliente. Embaixo de cada mês: comparação com o mês anterior e o acumulado do ano. * mês em andamento, ainda parcial.</span></div>';
-    h += '<div class="chart" style="height:180px">' + DRE_MESES.map((k, i) => '<div class="bar" style="cursor:default" title="' + lab(k) + parcial(k) + ': ' + money(fat[i]) + ' · acumulado ' + money(acc[i]) + '"><span class="val num">' + (fat[i] ? short(fat[i]) : '—') + '</span><span class="stack"><span style="display:block;height:' + (fat[i] ? Math.max(3, fat[i] / fm * 130).toFixed(1) : 0) + 'px;background:var(--navy);border-radius:3px 3px 0 0"></span></span></div>').join('') + '</div>';
-    h += '<div class="xlabels">' + DRE_MESES.map((k, i) => { const pv = i ? fat[i-1] : 0; const pc = pv && fat[i] ? (fat[i] / pv - 1) * 100 : null; return '<span>' + lab(k) + (parcial(k) ? '*' : '') + '<br>' + (pc == null ? '<small style="color:var(--muted)">—</small>' : '<b class="num" style="color:' + (pc < 0 ? 'var(--danger-ink)' : 'var(--ok-ink)') + '">' + (pc < 0 ? '▼ ' : '▲ ') + Math.abs(pc).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</b>') + '<br><small class="num" style="color:var(--muted)">' + (fat[i] ? 'acum. ' + short(acc[i]) : '') + '</small></span>'; }).join('') + '</div><div style="height:14px"></div></section>';
-    // tabela
-    h += '<section class="panel"><div class="drescroll"><table class="rel dre"><thead><tr><th>Fluxo de Caixa</th>' + DRE_MESES.map((k) => '<th class="r">' + lab(k) + '</th>').join('') + '<th class="r">Acumulado 2026</th></tr></thead><tbody>';
-    h += line('Saldo inicial', D.ini, 'subrow', null, false);
-    h += line('Recebimentos', D.rec, 'catrow', 'rec');
-    if (view.dreOpen.rec) Object.keys(D.recCat).forEach((k) => { h += '<tr class="subrow"><td style="padding-left:28px;color:var(--muted)">' + esc(k) + '</td>' + D.recCat[k].map((v) => cell(v)).join('') + cell(sumA(D.recCat[k])) + '</tr>'; });
-    h += line('(−) Fornecedores (CMV)', D.cmv.map((v) => -v));
-    h += line('(−) Frete', D.frete.map((v) => -v));
-    h += line('(−) Despesas operacionais', D.opex.map((v) => -v), 'catrow', 'opex');
-    if (view.dreOpen.opex) Object.keys(D.opexCat).sort((a,b) => sumA(D.opexCat[b].v) - sumA(D.opexCat[a].v)).forEach((k) => {
+      '<div class="kpi"><span>Faturamento ' + (todos ? 'acumulado 2026' : '· ' + per) + '</span><b class="num">' + money(sumA(fat)) + '</b><small>' + (todos ? 'janeiro a ' + mesNome(HOJE.slice(0,7)) : selK.length + (selK.length === 1 ? ' mês' : ' meses')) + ' · média ' + money(comDado ? sumA(fat) / comDado : 0) + '/mês</small></div>' +
+      '<div class="kpi"><span>Recebimentos' + (todos ? ' acumulados' : ' · ' + per) + '</span><b class="num">' + money(sumA(pk(D.rec))) + '</b><small>faturamento + devoluções e outras entradas</small></div>' +
+      '<div class="kpi"><span>Despesas' + (todos ? ' acumuladas' : ' · ' + per) + '</span><b class="num">' + money(despA) + '</b><small>CMV, frete e operacionais</small></div>' +
+      '<div class="kpi ' + (lucA < 0 ? 'd' : 'g') + '"><span>Lucro líquido' + (todos ? ' acumulado' : ' · ' + per) + '</span><b class="num"' + (lucA < 0 ? ' style="color:var(--danger-ink)"' : '') + '>' + (lucA < 0 ? '−' : '') + money(Math.abs(lucA)) + '</b><small>recebimentos menos despesas</small></div></div>';
+    h += '<div style="padding:12px 16px 0;border-top:1px solid var(--line)"><h3 style="margin:0;font-size:15px">Faturamento mês a mês · ' + per + '</h3><span style="color:var(--muted);font-size:13px">Recebimento de cliente. Embaixo de cada mês: comparação com o mês anterior e o acumulado ' + (todos ? 'do ano' : 'dos meses escolhidos') + '. * mês em andamento, ainda parcial.</span></div>';
+    h += '<div class="chart" style="height:180px">' + selK.map((k, j) => '<div class="bar" style="cursor:default" title="' + lab(k) + parcial(k) + ': ' + money(fat[j]) + ' · acumulado ' + money(acc[j]) + '"><span class="val num">' + (fat[j] ? short(fat[j]) : '—') + '</span><span class="stack"><span style="display:block;height:' + (fat[j] ? Math.max(3, fat[j] / fm * 130).toFixed(1) : 0) + 'px;background:var(--navy);border-radius:3px 3px 0 0"></span></span></div>').join('') + '</div>';
+    h += '<div class="xlabels">' + selK.map((k, j) => { const i = IX[j], pv = i ? fatT[i-1] : 0; const pc = pv && fatT[i] ? (fatT[i] / pv - 1) * 100 : null; return '<span>' + lab(k) + (parcial(k) ? '*' : '') + '<br>' + (pc == null ? '<small style="color:var(--muted)">—</small>' : '<b class="num" style="color:' + (pc < 0 ? 'var(--danger-ink)' : 'var(--ok-ink)') + '">' + (pc < 0 ? '▼ ' : '▲ ') + Math.abs(pc).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</b>') + '<br><small class="num" style="color:var(--muted)">' + (fat[j] ? 'acum. ' + short(acc[j]) : '') + '</small></span>'; }).join('') + '</div><div style="height:14px"></div></section>';
+    // tabela: só as colunas dos meses escolhidos; o total soma só eles
+    h += '<section class="panel"><div class="drescroll"><table class="rel dre"><thead><tr><th>Fluxo de Caixa</th>' + selK.map((k) => '<th class="r">' + lab(k) + '</th>').join('') + '<th class="r">' + (todos ? 'Acumulado 2026' : 'Total ' + per) + '</th></tr></thead><tbody>';
+    h += line('Saldo inicial', pk(D.ini), 'subrow', null, false);
+    h += line('Recebimentos', pk(D.rec), 'catrow', 'rec');
+    if (view.dreOpen.rec) Object.keys(D.recCat).filter((k) => pk(D.recCat[k]).some((v) => v)).forEach((k) => { h += '<tr class="subrow"><td style="padding-left:28px;color:var(--muted)">' + esc(k) + '</td>' + pk(D.recCat[k]).map((v) => cell(v)).join('') + cell(sumA(pk(D.recCat[k]))) + '</tr>'; });
+    h += line('(−) Fornecedores (CMV)', pk(D.cmv).map((v) => -v));
+    h += line('(−) Frete', pk(D.frete).map((v) => -v));
+    h += line('(−) Despesas operacionais', pk(D.opex).map((v) => -v), 'catrow', 'opex');
+    if (view.dreOpen.opex) Object.keys(D.opexCat).filter((k) => pk(D.opexCat[k].v).some((v) => v)).sort((a,b) => sumA(pk(D.opexCat[b].v)) - sumA(pk(D.opexCat[a].v))).forEach((k) => {
       const o = D.opexCat[k];
-      h += '<tr class="subrow"><td style="padding-left:20px"><button type="button" data-dre="tog:c:' + esc(k) + '" style="background:none;border:0;padding:2px 0;cursor:pointer;color:var(--ink);text-align:left">' + (view.dreOpen['c:' + k] ? '▾ ' : '▸ ') + esc(k) + '</button></td>' + o.v.map((v) => cell(-v)).join('') + cell(-sumA(o.v)) + '</tr>';
-      if (view.dreOpen['c:' + k]) Object.keys(o.subs).forEach((sk) => { h += '<tr class="subrow"><td style="padding-left:48px;color:var(--muted);font-size:12px">' + esc(sk) + '</td>' + o.subs[sk].map((v) => cell(-v)).join('') + cell(-sumA(o.subs[sk])) + '</tr>'; });
+      h += '<tr class="subrow"><td style="padding-left:20px"><button type="button" data-dre="tog:c:' + esc(k) + '" style="background:none;border:0;padding:2px 0;cursor:pointer;color:var(--ink);text-align:left">' + (view.dreOpen['c:' + k] ? '▾ ' : '▸ ') + esc(k) + '</button></td>' + pk(o.v).map((v) => cell(-v)).join('') + cell(-sumA(pk(o.v))) + '</tr>';
+      if (view.dreOpen['c:' + k]) Object.keys(o.subs).filter((sk) => pk(o.subs[sk]).some((v) => v)).forEach((sk) => { h += '<tr class="subrow"><td style="padding-left:48px;color:var(--muted);font-size:12px">' + esc(sk) + '</td>' + pk(o.subs[sk]).map((v) => cell(-v)).join('') + cell(-sumA(pk(o.subs[sk]))) + '</tr>'; });
     });
-    h += line('Lucro líquido', D.lucro, 'totrow');
-    h += line('Resultado com saldo inicial', D.fim, 'totrow', null, false);
-    h += '<tr class="subrow"><td>Saldo nos bancos <small style="color:var(--muted)">(último dia informado)</small></td>' + DRE_MESES.map((k) => { const u = ultimoSaldo(k); return u ? '<td class="r num" title="Informado em ' + dm(u.d) + '">' + (u.v < 0 ? '−' : '') + num(Math.abs(u.v)) + '<br><small style="color:var(--muted);font-weight:400">' + dm(u.d) + '</small></td>' : '<td></td>'; }).join('') + '<td></td></tr>';
+    h += line('Lucro líquido', pk(D.lucro), 'totrow');
+    h += line('Resultado com saldo inicial', pk(D.fim), 'totrow', null, false);
+    h += '<tr class="subrow"><td>Saldo nos bancos <small style="color:var(--muted)">(último dia informado)</small></td>' + selK.map((k) => { const u = ultimoSaldo(k); return u ? '<td class="r num" title="Informado em ' + dm(u.d) + '">' + (u.v < 0 ? '−' : '') + num(Math.abs(u.v)) + '<br><small style="color:var(--muted);font-weight:400">' + dm(u.d) + '</small></td>' : '<td></td>'; }).join('') + '<td></td></tr>';
     h += '</tbody></table></div><div class="hint"><span>De julho em diante, despesas e recebimentos vêm de Lançamentos de Caixa (BASE_DESPESAS e BASE_ENTRADAS da planilha V2_12); janeiro a junho vêm consolidados da aba DRE 2026, porque a base começa em julho. O faturamento da planilha do Cesar é lançado lá à mão. Saldo inicial de janeiro: ' + money(DRE_HIST.saldoJan) + ' e de julho: ' + money(+(CFG.saldoJul || 0)) + ', como na planilha.</span></div></section>';
     h += '<div class="foot"><span id="copyOut"></span></div>';
     app.innerHTML = h;
@@ -1873,6 +1879,12 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const db = e.target.closest('[data-dre]');
     if (db) { const [k, v] = db.dataset.dre.split(/:(.*)/s); if (k === 'tog') view.dreOpen[v] = !view.dreOpen[v];
       if (k === 'modo') view.dreModo = v;
+      if (k === 'sel') { // escolha dos meses do Fluxo de Caixa (shift + clique: intervalo)
+        if (v === 'todos') view.dreSel = [];
+        else if (e.shiftKey && view.dreSelUlt) { const a = DRE_MESES.indexOf(view.dreSelUlt), b = DRE_MESES.indexOf(v); view.dreSel = DRE_MESES.slice(Math.min(a, b), Math.max(a, b) + 1); }
+        else view.dreSel = view.dreSel.includes(v) ? view.dreSel.filter((x) => x !== v) : view.dreSel.concat(v);
+        if (view.dreSel.length === DRE_MESES.length) view.dreSel = [];
+        view.dreSelUlt = v === 'todos' ? '' : v; }
       if (k === 'togm') { const kk = 'm:' + v; const cur = view.dreOpenM[kk] !== undefined ? view.dreOpenM[kk] : view.dreAllM; view.dreOpenM[kk] = !cur; }
       if (k === 'aberto') { view.dreAllM = v === '1'; view.dreOpenM = {}; }
       if (k === 'mes') { const base = view.dreMes || (DRE_MESES.includes(HOJE.slice(0,7)) ? HOJE.slice(0,7) : '2026-07'); const j = DRE_MESES.indexOf(base) + parseInt(v,10); if (j >= 0 && j < DRE_MESES.length) view.dreMes = DRE_MESES[j]; }
