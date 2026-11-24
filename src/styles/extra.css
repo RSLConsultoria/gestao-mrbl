@@ -36,3 +36,13 @@ table.ptab.pchq{min-width:760px}table.pchq tr[data-qid]{cursor:pointer}table.pch
 
 table.dmes td:not(:first-child),table.dmes th:not(:first-child){min-width:78px}
 table.dmes tr.subrow td{padding-top:2px;padding-bottom:2px}
+
+/* Relatório: categoria e subcategoria numa linha só (seta, nome, previsão, nº de contas, atrasadas) */
+.rep .rlin{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.rep .rlin .rtog{display:inline-flex;flex-direction:row;align-items:center;gap:6px;white-space:nowrap}
+/* .rsub também é usado em outra tela (coluna centralizada); aqui é uma linha só */
+.rep .rlin .rtog.rsub{font-size:13px;line-height:18px}
+.rep .rlin .rseta{display:inline-block;width:12px;flex:none}
+.rep .rlin .rsemseta{cursor:default}
+.rep .rlin .pvtag{margin-left:2px}
+.rtog.rsub small{margin-left:4px}
