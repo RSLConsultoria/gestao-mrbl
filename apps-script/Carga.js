@@ -57,3 +57,26 @@ function apagarDados() {
     });
   } finally { trava.releaseLock(); }
 }
+
+// Histórico consolidado de um ano fechado (ex.: 2025) para a visão comparativa do Fluxo de Caixa.
+// O arquivo é lido no navegador de quem importa; aqui só troca as linhas daquele ano na aba DreHistorico.
+acao_('historico.importar', function (d, s) {
+  Usuarios.exigirAdmin_(s);
+  var ano = String(d.ano || '');
+  if (!/^\d{4}$/.test(ano)) throw Auth.erro('ano_invalido', 'Ano inválido.');
+  var linhas = d.linhas || [];
+  if (!linhas.length) throw Auth.erro('historico_vazio', 'O arquivo não trouxe valores para importar.');
+  var tipos = ['rec', 'fat', 'saldo', 'cmv', 'frete', 'opex'];
+  linhas.forEach(function (l) {
+    if (String(l.mes).slice(0, 4) !== ano) throw Auth.erro('historico_ano', 'Há linha fora de ' + ano + ' (' + l.mes + ').');
+    if (tipos.indexOf(l.tipo) < 0) throw Auth.erro('historico_tipo', 'Tipo de linha desconhecido: ' + l.tipo + '.');
+  });
+  var trava = LockService.getScriptLock();
+  trava.waitLock(30000);
+  try {
+    var outras = Db.todos('DreHistorico').filter(function (r) { return String(r.mes).slice(0, 4) !== ano; });
+    Db.substituir('DreHistorico', outras.concat(linhas.map(function (l) { return { mes: String(l.mes), tipo: l.tipo, cat: l.cat || '', sub: l.sub || '', valor: Math.round((+l.valor || 0) * 100) / 100 }; })));
+    Logs.registrar(s.usuario, 'dre', 'Importou o histórico de ' + ano + ' do Fluxo de Caixa (' + linhas.length + ' linhas)');
+    return { linhas: linhas.length, ano: ano };
+  } finally { trava.releaseLock(); }
+});

@@ -1,6 +1,7 @@
 // Telas do app, portadas do protótipo aprovado (artefato "MRBL A Pagar", versão 57; cópia em reference/mock.html).
 // O estado vem do servidor (dados.carregar) e cada ação grava na planilha só o que mudou (ver sync.js).
 /* eslint-disable */
+import { lerFluxoConsolidado } from './historico.js';
 const LISTAS = {"DESPESAS COM FUNCIONARIOS": ["SALARIOS", "SALARIOS PJ", "PLANO DE SAUDE", "CONVENIOS FARMACIA / LOJA", "PREMIO", "REEMBOLSO", "RESCISÃO", "ACORDO TRABALHISTA", "UNIFORME/SAPATOS/EPI", "FERIAS", "VALE ALIMETAÇÃO/ VALE REFEIÇÃO", "SEGURO DE VIDA", "PENSÃO", "EMPRESTIMOS", "HORAS EXTRAS", "VALE TRANSPORTE", "CURSOS/ TREINAMENTOS", "OUTRAS DIVERSAS RH (ALIMENTAÇÃO)", "ATESTADO MEDICO ADMIS / DEMISSIONAL /EXAME MEDICO", "13 SALARIO"], "ENCARGOS SOCIAIS": ["INSS / GPS", "IRRF", "IRRF ( PARCELAMENTO)", "DARF", "GRRF", "SINDICATO / ISS", "FGTS (PARCELAMENTO)", "FGTS"], "DESPESAS COM UTILITARIOS E SERVIÇOS": ["AGUA E ESGOTO", "ENERGIA ELETRICA", "TELEFONE FIXO", "TELEFONE CELULAR", "INTERNET", "OUTROS / DIVERSOS"], "DESPESAS TRIBUTARIAS FEDERAIS": ["PIS", "COFINS", "IRPJ", "CSSLL", "DAS", "IPI", "DAE", "ICMS", "PARCELAMENTO ICMS"], "DESPESAS TRIBUTARIAS MUNICIPAIS": ["IPTU (OUTRAS TAXAS EM GERAL)"], "DESPESAS COM VENDAS E MKT": ["PATROCINIO", "PROPAGANDA/MARKETING", "VEICULOS DE COMUNICAÇÃO", "BONIFICAÇÃO PARA PARCEIROS", "CONSULTAS DE CREDITO (SERASA)", "COMISSOES/GRATIFICAÇÕES", "ASSOCIAÇÕES E SINDICATOS", "OUTRAS"], "DESPESAS ADMINISTRATIVA": ["MATERIAL DE ESCRITORIO", "CARTÃO DE CREDITO", "CORREIO", "MOTOTAXI / ENTREGAS RAPIDAS", "CONSULTORIA/ADVOGADOS", "CONTABILIDADE", "CAIXA INTERNO", "COMPRA EQUIPAMENTOS / MOVÉIS E UTENSÍLIOS", "MANUTENÇÃO DE MÁQUINAS", "MATERIAL USO CONSUMO", "MATERIAL DE EMBALAGENS", "INFORMATICA/SISTEMA", "RECRUTAMENTO ( PUPLICAÇÃO VAGA EMPREGO)", "DESPESA DE VIAGEM / HOSPEDAGEM / CONDOMINIO", "SEM PARAR", "SEGURO EMPRESA", "TAXAS DIVERSAS (CARTORIO)", "ALARME MONITORADO/SEGURANÇA", "LIMPEZA EM GERAL", "TAXAS DIVERSAS"], "ACESSORIAS": ["ACESSORIAS EM GERAL (OF)", "ACESSORIAS EM GERAL (OF) SN", "TERCEIRIZADOS (PJ)", "PASSIVOS DIVERSOS (CO/ST)"], "MANUTENCAO PREDIAL": ["MATERIAIS P/ CONSTRUÇÃO E FERRAMENTAS", "COLETA DE RESIDUOS", "ELEVADOR"], "PREJUIZOS": ["USO E CONSUMO", "PERDAS EM GERAL"], "DESPESAS FINANCEIRAS": ["CAPITALIZAÇÃO E SEGUROS", "TARIFA DIVERSAS + JUROS", "AMORTIZAÇÃO CONTA GARANTIA", "DEVOLUÇÕES DUPLICIDADE TÍTULOS", "ESTORNO", "TAXA DE ANTECIPAÇÃO DE RECEBIVEIS", "PROFINANCE ( EMPRESTIMO)", "TRANSFERENCIA"], "FINANCIAMENTOS": ["FINANCIAMENTO BNDES / PRONAMPE", "CONSÓRCIO / EMPRÉSTIMOS", "VEICULOS E OUTROS"], "PRÓ-LABORE": ["DIRETORIA", "INVESTIMENTOS PESSOAIS"], "AQUISIÇÕES / INVESTIMENTOS": ["COMPRA DE MAQUINAS", "ANIMALE ( EMPRESTIMO SEDA )", "CONSTRUÇÃO EM ANDAMENTO"], "MANUTENÇAO VEICULAR": ["TRIBUTOS (IPVA / LICENCIAMENTO / OUTROS / MULTAS )", "SEGURO CARRO", "COMBUSTÍVEL", "MANUTENÇÃO / PEÇAS DE VEÍCULOS"], "PROVISAO": ["FESTA FINAL DE ANO", "13º SALARIO", "FÉRIAS"], "ALUGUEL": ["ALUGUEL"], "FORNECEDORES (CMV)": ["FORNECEDORES"], "FRETE": ["FRETE"]};
 const EMPS = ["MRBL", "STOFFA"];
 const ECATS = ["RECEBIMENTO DE CLIENTE", "DEVOLUÇÃO", "RECEBIMENTO MRBL", "RECEBIMENTO STOFFA", "EMPRÉSTIMO PROFINANCE", "ANTECIPAÇÃO"];
@@ -103,7 +104,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
 
   const blankD = () => ({ data: HOJE, cat: '', sub: '', emp: 'MRBL', valor: '', forn: '', resp: RESPS[RESPS.length-1] || '', obs: '', contaId: null });
   const blankE = () => ({ data: HOJE, cat: ECATS[0], cli: '', nf: '', valor: '', resp: RESPS[RESPS.length-1] || '', obs: '' });
-  const view = { cfgTab: 'listas', cfgQ: '', pvYear: 0, cfgCat: AC, newSub: '', modal: null, dForm: blankD(), eForm: blankE(), dStatus: '', eStatus: '', drelTab: 'sai', dreProj: false, dreOpen: {}, dreSel: [], dreSelUlt: '', dreModo: 'anual', dreMes: '', dreOpenM: {}, dreAllM: true, drelMes: iso(TODAY).slice(0,7), relVis: 'semana', relMes: iso(TODAY).slice(0,7), relVal: 'all', relOpen: {}, prMes: (() => { const d = new Date(TODAY.getFullYear(), TODAY.getMonth()-1, 1); return d.getFullYear() + '-' + pad(d.getMonth()+1); })(), tela: 'pagar', ofWeek: iso(monday(TODAY)), receiving: null, week: iso(monday(TODAY)), addErr: '', paying: null, removing: null, proring: null, histOpen: null, newCat: CATS[0], pCat: AC };
+  const view = { cfgTab: 'listas', cfgQ: '', pvYear: 0, cfgCat: AC, newSub: '', modal: null, dForm: blankD(), eForm: blankE(), dStatus: '', eStatus: '', drelTab: 'sai', dreProj: false, dreOpen: {}, dreSel: [], dreSelUlt: '', dreCmp: 'ant', dreCOpen: {}, histPrev: null, dreModo: 'anual', dreMes: '', dreOpenM: {}, dreAllM: true, drelMes: iso(TODAY).slice(0,7), relVis: 'semana', relMes: iso(TODAY).slice(0,7), relVal: 'all', relOpen: {}, prMes: (() => { const d = new Date(TODAY.getFullYear(), TODAY.getMonth()-1, 1); return d.getFullYear() + '-' + pad(d.getMonth()+1); })(), tela: 'pagar', ofWeek: iso(monday(TODAY)), receiving: null, week: iso(monday(TODAY)), addErr: '', paying: null, removing: null, proring: null, histOpen: null, newCat: CATS[0], pCat: AC };
   if (converterFixos()) { msgPendente = 'Oficinas com pagamento fixo: contas ajustadas para a data do pagamento.'; save(); }
   let undoSnap = null, toastTimer = null;
   const snap = () => JSON.stringify(S);
@@ -1498,6 +1499,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const H = { recCat: {}, cmv: [0,0,0,0,0,0], frete: [0,0,0,0,0,0], opexCat: {}, saldoJan: +(CFG.saldoJan || 0) };
     const z = () => [0,0,0,0,0,0];
     (dados.dreHistorico || []).forEach((r) => {
+      if (String(r.mes).slice(0,4) !== '2026') return; // outros anos (ex.: 2025) são só para a visão comparativa
       const i = +String(r.mes).slice(5,7) - 1; if (!(i >= 0 && i < 6)) return; const v = +r.valor || 0;
       if (r.tipo === 'rec') (H.recCat[r.cat] = H.recCat[r.cat] || z())[i] += v;
       else if (r.tipo === 'cmv' || r.tipo === 'frete') H[r.tipo][i] += v;
@@ -1620,6 +1622,151 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const same = [...document.querySelectorAll('input.sbi')].filter((x) => x.dataset.sb.startsWith(d + '|')); const nx = same[same.indexOf(el) + 1];
     if (nx) { nx.focus(); nx.select(); } else el.blur();
   });
+  // ---------- Fluxo de Caixa: visão comparativa ----------
+  // Anos fechados (ex.: 2025) vêm da aba DreHistorico, importados da aba consolidada da planilha DRE
+  // (Fluxo de Caixa › Visão comparativa › Importar). 2026 vem do próprio sistema (dreData).
+  const HIST = dados.dreHistorico || [];
+  const histCache = {};
+  function histAno(ano){
+    if (histCache[ano]) return histCache[ano];
+    const z = () => Array(12).fill(0);
+    const H = { rec: z(), recCat: {}, cmv: z(), frete: z(), opex: z(), opexCat: {}, fat: z(), tem: false };
+    HIST.forEach((r) => {
+      if (String(r.mes).slice(0,4) !== String(ano)) return;
+      const i = +String(r.mes).slice(5,7) - 1; if (!(i >= 0 && i < 12)) return; const v = +r.valor || 0;
+      if (r.tipo === 'rec') { H.tem = true; H.rec[i] += v; (H.recCat[r.cat] = H.recCat[r.cat] || z())[i] += v; }
+      else if (r.tipo === 'fat') H.fat[i] += v;
+      else if (r.tipo === 'cmv' || r.tipo === 'frete') H[r.tipo][i] += v;
+      else if (r.tipo === 'opex') { H.opex[i] += v; const o = H.opexCat[r.cat] = H.opexCat[r.cat] || { v: z(), subs: {} }; o.v[i] += v; (o.subs[r.sub || '—'] = o.subs[r.sub || '—'] || z())[i] += v; }
+    });
+    H.lucro = H.rec.map((x, i) => x - H.cmv[i] - H.frete[i] - H.opex[i]);
+    return (histCache[ano] = H);
+  }
+  // soma um período (lista de [ano, mês 0-11])
+  function dreAgg(P, D){
+    const o = { rec: 0, recCat: {}, cmv: 0, frete: 0, opex: 0, opexCat: {}, lucro: 0 };
+    P.forEach(([a, i]) => { const X = a === 2026 ? D : histAno(a);
+      o.rec += X.rec[i] || 0; o.cmv += X.cmv[i] || 0; o.frete += X.frete[i] || 0; o.opex += X.opex[i] || 0;
+      Object.keys(X.recCat).forEach((k) => { o.recCat[k] = (o.recCat[k] || 0) + (X.recCat[k][i] || 0); });
+      Object.keys(X.opexCat).forEach((k) => { const c = o.opexCat[k] = o.opexCat[k] || { v: 0, subs: {} }; c.v += X.opexCat[k].v[i] || 0;
+        Object.keys(X.opexCat[k].subs).forEach((s) => { c.subs[s] = (c.subs[s] || 0) + (X.opexCat[k].subs[s][i] || 0); }); }); });
+    o.lucro = o.rec - o.cmv - o.frete - o.opex; o.desp = o.cmv + o.frete + o.opex;
+    return o;
+  }
+  const M3 = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  const plab = (P) => { const l = ([a, i]) => M3[i] + '/' + String(a).slice(2); if (!P.length) return '—'; if (P.length === 1) return l(P[0]);
+    const seq = P.every(([a, i], j) => !j || (a * 12 + i) - (P[j-1][0] * 12 + P[j-1][1]) === 1); return seq ? l(P[0]) + ' a ' + l(P[P.length - 1]) : P.map(l).join(', '); };
+  const pct = (a, b) => b ? (a - b) / Math.abs(b) * 100 : null; // base negativa (prejuízo): sai do prejuízo = variação positiva
+  // variação: bom = verde. Para receita e lucro, subir é bom; para despesa, descer é bom.
+  const varTag = (a, b, sobeBom) => { const p = pct(a, b); if (p == null || !isFinite(p)) return '<span class="cmpv">—</span>'; const bom = (p >= 0) === sobeBom; return '<span class="cmpv ' + (Math.abs(p) < 0.05 ? '' : bom ? 'ok' : 'bad') + '">' + (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</span>'; };
+  const difTag = (a, b, sobeBom) => { const d = a - b; if (Math.abs(d) < 0.005) return '<span class="cmpv">0,00</span>'; const bom = (d >= 0) === sobeBom; return '<span class="cmpv ' + (bom ? 'ok' : 'bad') + '">' + (d > 0 ? '+' : '−') + num(Math.abs(d)) + '</span>'; };
+  const precisa = (P) => [...new Set(P.map(([a]) => a).filter((a) => a !== 2026))];
+
+  function dreCmpTabela(A, B, PA, PB, D){
+    const a = dreAgg(PA, D), b = dreAgg(PB, D), op = view.dreCOpen;
+    const cel = (v) => '<td class="r num">' + (v ? num(v) : '') + '</td>';
+    const row = (lab, va, vb, sobeBom, cls, tog, ind) => '<tr class="' + (cls || 'catrow') + '"><td' + (ind ? ' style="padding-left:' + ind + 'px' + (ind > 20 ? ';color:var(--muted);font-size:12.5px' : '') + '"' : '') + '>' + (tog ? '<button type="button" class="cmptog" data-dre="ctog:' + esc(tog) + '">' + (op[tog] ? '▾ ' : '▸ ') + lab + '</button>' : lab) + '</td>' + cel(va) + cel(vb) + '<td class="r num">' + difTag(va, vb, sobeBom) + '</td><td class="r num">' + varTag(va, vb, sobeBom) + '</td></tr>';
+    let h = '<section class="panel"><div class="drescroll"><table class="rel dre cmpt"><thead><tr><th>Fluxo de Caixa</th><th class="r">' + A + '</th><th class="r">' + B + '</th><th class="r">Diferença</th><th class="r">Variação</th></tr></thead><tbody>';
+    h += row('Recebimentos', a.rec, b.rec, true, 'catrow', 'rec');
+    if (op.rec) [...new Set(Object.keys(a.recCat).concat(Object.keys(b.recCat)))].filter((k) => a.recCat[k] || b.recCat[k]).sort((x, y) => (a.recCat[y] || 0) - (a.recCat[x] || 0)).forEach((k) => { h += row(esc(k), a.recCat[k] || 0, b.recCat[k] || 0, true, 'subrow', null, 28); });
+    h += row('(−) Fornecedores (CMV)', a.cmv, b.cmv, false);
+    h += row('(−) Frete', a.frete, b.frete, false);
+    h += row('(−) Despesas operacionais', a.opex, b.opex, false, 'catrow', 'opex');
+    if (op.opex) [...new Set(Object.keys(a.opexCat).concat(Object.keys(b.opexCat)))].filter((k) => (a.opexCat[k] || {}).v || (b.opexCat[k] || {}).v)
+      .sort((x, y) => Math.abs(((a.opexCat[y] || {}).v || 0) - ((b.opexCat[y] || {}).v || 0)) - Math.abs(((a.opexCat[x] || {}).v || 0) - ((b.opexCat[x] || {}).v || 0))).forEach((k) => {
+        const ca = a.opexCat[k] || { v: 0, subs: {} }, cb = b.opexCat[k] || { v: 0, subs: {} };
+        h += row(esc(k), ca.v, cb.v, false, 'subrow', 'c:' + k, 20);
+        if (op['c:' + k]) [...new Set(Object.keys(ca.subs).concat(Object.keys(cb.subs)))].filter((s) => ca.subs[s] || cb.subs[s]).sort((x, y) => (ca.subs[y] || 0) - (ca.subs[x] || 0)).forEach((s) => { h += row(esc(s), ca.subs[s] || 0, cb.subs[s] || 0, false, 'subrow', null, 48); });
+      });
+    h += row('Despesas totais', a.desp, b.desp, false, 'totrow');
+    h += row('Lucro líquido', a.lucro, b.lucro, true, 'totrow');
+    return h + '</tbody></table></div><div class="hint"><span>Despesas aparecem como valores positivos. Na diferença e na variação, verde é melhor e vermelho é pior: receita e lucro subindo, despesa caindo. As categorias abertas ficam em ordem da maior mudança.</span></div></section>';
+  }
+  function dreCmpCards(A, B, PA, PB, D){
+    const a = dreAgg(PA, D), b = dreAgg(PB, D);
+    const card = (t, va, vb, sobeBom, cls) => '<div class="kpi' + (cls ? ' ' + cls : '') + '"><span>' + t + '</span><b class="num"' + (va < 0 ? ' style="color:var(--danger-ink)"' : '') + '>' + (va < 0 ? '−' : '') + money(Math.abs(va)) + '</b><small>' + B + ': ' + (vb < 0 ? '−' : '') + money(Math.abs(vb)) + ' · ' + varTag(va, vb, sobeBom) + '</small></div>';
+    return '<div class="kpis" style="padding:12px 16px 4px">' + card('Recebimentos · ' + A, a.rec, b.rec, true) + card('Despesas · ' + A, a.desp, b.desp, false) + card('Despesas operacionais · ' + A, a.opex, b.opex, false) + card('Lucro líquido · ' + A, a.lucro, b.lucro, true, a.lucro < 0 ? 'd' : 'g') + '</div>';
+  }
+  function dreImportHTML(anos){
+    if (view.histPrev) {
+      const r = view.histPrev, ok = (m) => m.lucroPlanilha == null || Math.abs(m.lucro - m.lucroPlanilha) <= 1;
+      return '<div class="cmpimp"><h3>Conferir antes de importar · ' + esc(r.ano) + '</h3><p>Aba <b>' + esc(r.aba) + '</b>: ' + r.linhas.length + ' linhas, ' + r.categorias.length + ' categorias. O lucro de cada mês é recalculado e comparado com a linha LUCRO LIQUIDO da planilha.</p>' +
+        '<div class="drescroll"><table class="rel dre"><thead><tr><th>Mês</th><th class="r">Recebimentos</th><th class="r">CMV</th><th class="r">Frete</th><th class="r">Despesas operacionais</th><th class="r">Lucro calculado</th><th class="r">Lucro na planilha</th><th>Confere</th></tr></thead><tbody>' +
+        r.meses.map((m, i) => '<tr><td>' + M3[i] + '/' + String(r.ano).slice(2) + '</td><td class="r num">' + num(m.rec) + '</td><td class="r num">' + num(m.cmv) + '</td><td class="r num">' + num(m.frete) + '</td><td class="r num">' + num(m.opex) + '</td><td class="r num">' + (m.lucro < 0 ? '−' : '') + num(Math.abs(m.lucro)) + '</td><td class="r num">' + (m.lucroPlanilha == null ? '—' : (m.lucroPlanilha < 0 ? '−' : '') + num(Math.abs(m.lucroPlanilha))) + '</td><td>' + (ok(m) ? '<span class="cmpv ok">✓</span>' : '<span class="cmpv bad">diferente</span>') + '</td></tr>').join('') + '</tbody></table></div>' +
+        (r.avisos.length ? '<ul class="cmpav">' + r.avisos.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul>' : '') +
+        '<div class="cmpbt"><button type="button" class="btn" data-dre="himp:nao">Cancelar</button><button type="button" class="btn y" data-dre="himp:sim">Importar ' + esc(r.ano) + ' para o sistema</button></div></div>';
+    }
+    if (!anos.length) return '';
+    return '<div class="cmpimp"><h3>' + anos.join(' e ') + ' ainda não ' + (anos.length > 1 ? 'estão' : 'está') + ' no sistema</h3><p>Para comparar com o ano passado, importe a planilha DRE de ' + anos.join(' e ') + ' (aba consolidada, ex.: "DRE ' + anos[0] + '_CONS"). O arquivo é lido aqui no navegador e os valores vão para a planilha do sistema; você confere mês a mês antes de gravar.</p>' +
+      (ADMIN ? '<label class="btn y">Importar ' + anos[0] + ' (Excel)<input type="file" id="histFile" accept=".xlsx" hidden></label>' : '<p><b>Peça ao administrador para importar.</b></p>') + '</div>';
+  }
+  function dreCompHTML(D){
+    const modo = view.dreCmp || 'ant', ci = Math.max(0, DRE_MESES.indexOf(HOJE.slice(0,7)));
+    const sel = DRE_MESES.filter((k) => view.dreSel.includes(k)).map((k) => DRE_MESES.indexOf(k));
+    const base = sel.length ? sel : [ci];
+    const lab26 = (k) => M3[DRE_MESES.indexOf(k)] + '/26';
+    const todos = !sel.length;
+    let h = '<div class="dresel" role="group" aria-label="Meses"><span>Meses</span>' + DRE_MESES.map((k) => '<button type="button" data-dre="sel:' + k + '" aria-pressed="' + (!todos && view.dreSel.includes(k)) + '">' + lab26(k) + '</button>').join('') +
+      '<button type="button" class="dresel-todos" data-dre="sel:todos" aria-pressed="' + todos + '">Limpar</button><small>' + (todos ? (modo === 'ytd' ? 'Sem meses escolhidos: janeiro até ' + M3[ci] + '/26.' : 'Sem meses escolhidos: compara ' + M3[ci] + '/26 (mês atual).') + ' Escolha um ou mais meses; Shift + clique escolhe um intervalo.' : 'Escolhidos: ' + plab(sel.map((i) => [2026, i])) + '.') + '</small></div>';
+    const temSel2 = sel.length === 2;
+    h += '<div class="cmpmodo" role="tablist" aria-label="Comparar com">' + [['ant', 'Mês anterior'], ['ano', 'Mesmo mês de 2025'], ['entre', 'Entre os 2 meses escolhidos'], ['ytd', '2026 × 2025']].map(([k, t]) => '<button type="button" role="tab" data-dre="cmp:' + k + '" aria-selected="' + (modo === k) + '">' + t + '</button>').join('') + '</div>';
+    let PA, PB, nota = '';
+    if (modo === 'ant') { PA = base.map((i) => [2026, i]); PB = base.map((i) => i ? [2026, i - 1] : [2025, 11]); nota = 'Cada mês escolhido comparado com o mês anterior a ele.'; }
+    else if (modo === 'ano') { PA = base.map((i) => [2026, i]); PB = base.map((i) => [2025, i]); nota = 'Os mesmos meses em 2025.'; }
+    else if (modo === 'entre') {
+      if (!temSel2) return h + '</section><div class="cmpimp"><h3>Escolha 2 meses</h3><p>Marque exatamente dois meses acima (ex.: out/26 e nov/26) para comparar um com o outro.' + (sel.length ? ' Agora ' + (sel.length === 1 ? 'há 1 escolhido' : 'há ' + sel.length + ' escolhidos') + '.' : '') + '</p></div>';
+      PA = [[2026, sel[1]]]; PB = [[2026, sel[0]]]; nota = 'O mês mais recente comparado com o mais antigo.';
+    } else { const ms = sel.length ? sel : Array.from({ length: ci + 1 }, (_, i) => i); PA = ms.map((i) => [2026, i]); PB = ms.map((i) => [2025, i]); nota = 'Mês a mês, 2026 contra os mesmos meses de 2025.'; }
+    const falta = precisa(PA.concat(PB)).filter((a) => !histAno(a).tem);
+    if (falta.length || view.histPrev) return h + '</section>' + dreImportHTML(falta);
+    const A = plab(PA), B = plab(PB), parcial = PA.some(([a, i]) => a === 2026 && i === ci) ? ' <b>* ' + M3[ci] + '/26 ainda está em andamento.</b>' : '';
+    h += '<p class="cmpnota">' + nota + parcial + (precisa(PB).length && ADMIN ? ' <button type="button" class="lnk" data-dre="himp:novo">Importar 2025 de novo</button><input type="file" id="histFile" accept=".xlsx" hidden>' : '') + '</p>';
+    h += dreCmpCards(A, B, PA, PB, D);
+    if (modo === 'ytd') {
+      const rows = PA.map(([, i]) => { const a = dreAgg([[2026, i]], D), b = dreAgg([[2025, i]], D); return { i, a, b }; });
+      const fm = Math.max(1, ...rows.flatMap((r) => [r.a.rec, r.b.rec]));
+      h += '<div style="padding:12px 16px 0;border-top:1px solid var(--line)"><h3 style="margin:0;font-size:15px">Recebimentos mês a mês · 2026 × 2025</h3><span class="cmpleg"><i class="c26"></i>2026 <i class="c25"></i>2025</span></div>';
+      h += '<div class="chart cmpchart" style="height:190px">' + rows.map((r) => '<div class="bar" style="cursor:default" title="' + M3[r.i] + ': 2026 ' + money(r.a.rec) + ' · 2025 ' + money(r.b.rec) + '"><span class="val num">' + (r.a.rec ? short(r.a.rec) : '—') + '</span><span class="stack cmpstk"><span class="c25" style="height:' + (r.b.rec ? Math.max(3, r.b.rec / fm * 130).toFixed(1) : 0) + 'px"></span><span class="c26" style="height:' + (r.a.rec ? Math.max(3, r.a.rec / fm * 130).toFixed(1) : 0) + 'px"></span></span></div>').join('') + '</div>';
+      h += '<div class="xlabels">' + rows.map((r) => '<span>' + M3[r.i] + (r.i === ci ? '*' : '') + '<br>' + varTag(r.a.rec, r.b.rec, true) + '</span>').join('') + '</div><div style="height:14px"></div></section>';
+      const c = (v) => '<td class="r num">' + (v ? (v < 0 ? '−' : '') + num(Math.abs(v)) : '') + '</td>';
+      const tot = (f) => rows.reduce((t, r) => t + f(r), 0);
+      h += '<section class="panel"><div class="ph"><h2>2026 × 2025 mês a mês</h2></div><div class="drescroll"><table class="rel dre cmpt"><thead><tr><th>Mês</th><th class="r">Recebimentos 2026</th><th class="r">2025</th><th class="r">Variação</th><th class="r">Despesas 2026</th><th class="r">2025</th><th class="r">Variação</th><th class="r">Lucro 2026</th><th class="r">2025</th><th class="r">Diferença</th></tr></thead><tbody>' +
+        rows.map((r) => '<tr class="subrow"><td>' + M3[r.i] + (r.i === ci ? '*' : '') + '</td>' + c(r.a.rec) + c(r.b.rec) + '<td class="r num">' + varTag(r.a.rec, r.b.rec, true) + '</td>' + c(r.a.desp) + c(r.b.desp) + '<td class="r num">' + varTag(r.a.desp, r.b.desp, false) + '</td>' + c(r.a.lucro) + c(r.b.lucro) + '<td class="r num">' + difTag(r.a.lucro, r.b.lucro, true) + '</td></tr>').join('') +
+        '<tr class="totrow"><td>Total</td>' + c(tot((r) => r.a.rec)) + c(tot((r) => r.b.rec)) + '<td class="r num">' + varTag(tot((r) => r.a.rec), tot((r) => r.b.rec), true) + '</td>' + c(tot((r) => r.a.desp)) + c(tot((r) => r.b.desp)) + '<td class="r num">' + varTag(tot((r) => r.a.desp), tot((r) => r.b.desp), false) + '</td>' + c(tot((r) => r.a.lucro)) + c(tot((r) => r.b.lucro)) + '<td class="r num">' + difTag(tot((r) => r.a.lucro), tot((r) => r.b.lucro), true) + '</td></tr></tbody></table></div></section>';
+      h += '<div class="cmpsub"><h2>Por categoria · ' + A + ' × ' + B + '</h2></div>';
+    } else h += '<div style="height:12px"></div></section>';
+    return h + dreCmpTabela(A, B, PA, PB, D);
+  }
+  async function lerHistArquivo(file){
+    try {
+      await loadJs(XLS);
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
+      const ehCons = (w) => /CONS/i.test(w.name);
+      const abas = wb.worksheets.filter((w) => { let ok = false; for (let r = 1; r <= Math.min(6, w.rowCount) && !ok; r++) w.getRow(r).eachCell((c) => { if (normTxt(cellVal(c.value)) === 'JANEIRO') ok = true; }); return ok; });
+      const ws = abas.find(ehCons) || abas[0];
+      if (!ws) { toast('Não achei no arquivo uma aba com os meses de JANEIRO a DEZEMBRO (ex.: "DRE 2025_CONS").', false); return; }
+      const rows = []; ws.eachRow({ includeEmpty: true }, (row, n) => { rows[n - 1] = (row.values || []).slice(1).map(cellVal); });
+      for (let i = 0; i < rows.length; i++) rows[i] = rows[i] || [];
+      const anoTxt = (ws.name.match(/20\d\d/) || [])[0] || ((rows.flat().map((v) => String(v || '')).find((t) => /^FATURAMENTO 20\d\d/i.test(t)) || '').match(/20\d\d/) || [])[0];
+      if (!anoTxt || anoTxt === '2026') { toast('Não consegui saber de que ano é a aba "' + ws.name + '". O nome deve ter o ano, como "DRE 2025_CONS".', false); return; }
+      const r = lerFluxoConsolidado(rows, anoTxt, LISTAS); r.aba = ws.name;
+      view.histPrev = r; render();
+    } catch (err) { console.error(err); toast('Não consegui ler o arquivo: ' + err.message, false); }
+  }
+  document.addEventListener('change', (e) => {
+    if (e.target.id !== 'histFile') return;
+    const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) lerHistArquivo(f);
+  });
+  function histImportar(){
+    const r = view.histPrev; if (!r) return;
+    api.chamar('historico.importar', { ano: r.ano, linhas: r.linhas }).then(() => {
+      for (let i = HIST.length - 1; i >= 0; i--) if (String(HIST[i].mes).slice(0,4) === r.ano) HIST.splice(i, 1);
+      r.linhas.forEach((l) => HIST.push(l)); delete histCache[+r.ano]; delete histCache[r.ano];
+      S.logs.unshift({ em: agora(), por: S.user, txt: 'Importou o histórico de ' + r.ano + ' do Fluxo de Caixa (' + r.linhas.length + ' linhas)', tela: 'dre' });
+      view.histPrev = null; render(); toast(r.ano + ' importado. Já dá para comparar.', false);
+    }, (err) => toast('Não gravou: ' + err.message, false));
+  }
+
   function renderDre(){
     const app = document.getElementById('app');
     const D = dreData();
@@ -1630,8 +1777,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const line = (label, arr, cls, tog, total) => '<tr class="' + (cls || 'catrow') + '"><td>' + (tog ? '<button type="button" data-dre="tog:' + esc(tog) + '" style="background:none;border:0;padding:6px 0;font-weight:700;cursor:pointer;color:var(--ink);text-align:left">' + (view.dreOpen[tog] ? '▾ ' : '▸ ') + label + '</button>' : label) + '</td>' + arr.map((v) => cell(v)).join('') + (total === false ? '<td></td>' : cell(sumA(arr))) + '</tr>';
     let h = '<section class="today"><h1>Fluxo de Caixa</h1><span class="sub">Regime de caixa: entradas recebidas e contas pagas, no mês do pagamento. Recebimento MRBL e Recebimento STOFFA ficam de fora.</span></section>';
     h += '<section class="panel"><div class="ph"><div style="color:var(--muted);font-size:14px">Só lançamentos consolidados do Fluxo de Caixa. Contas a pagar não entram aqui.</div>' +
-      '<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" data-dre="modo:anual" style="' + seg(view.dreModo !== 'mensal') + '">Visão anual</button><button type="button" data-dre="modo:mensal" style="' + seg(view.dreModo === 'mensal') + '">Visão mensal</button><button type="button" class="btn sm" data-tela="drel">Ver lançamentos</button></div></div>';
+      '<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" data-dre="modo:anual" style="' + seg(view.dreModo !== 'mensal') + '">Visão anual</button><button type="button" data-dre="modo:mensal" style="' + seg(view.dreModo === 'mensal') + '">Visão mensal</button><button type="button" data-dre="modo:comp" style="' + seg(view.dreModo === 'comp') + '">Visão comparativa</button><button type="button" class="btn sm" data-tela="drel">Ver lançamentos</button></div></div>';
     if (view.dreModo === 'mensal') { sbCalc = null; h += dreMensalHTML(D, sumA); app.innerHTML = h; sbAtualiza(); return; }
+    if (view.dreModo === 'comp') { h += dreCompHTML(D); app.innerHTML = h; return; }
     const parcial = (k) => k === HOJE.slice(0,7) ? ' (parcial)' : '';
     // meses escolhidos (vazio = ano todo): os cards, o gráfico e a tabela mostram só eles
     const selK = DRE_MESES.filter((k) => !view.dreSel.length || view.dreSel.includes(k)), IX = selK.map((k) => DRE_MESES.indexOf(k)), todos = selK.length === DRE_MESES.length;
@@ -1879,6 +2027,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const db = e.target.closest('[data-dre]');
     if (db) { const [k, v] = db.dataset.dre.split(/:(.*)/s); if (k === 'tog') view.dreOpen[v] = !view.dreOpen[v];
       if (k === 'modo') view.dreModo = v;
+      if (k === 'cmp') view.dreCmp = v;
+      if (k === 'ctog') view.dreCOpen[v] = !view.dreCOpen[v];
+      if (k === 'himp') { if (v === 'sim') { histImportar(); return; } if (v === 'novo') { const f = document.getElementById('histFile'); if (f) f.click(); return; } view.histPrev = null; }
       if (k === 'sel') { // escolha dos meses do Fluxo de Caixa (shift + clique: intervalo)
         if (v === 'todos') view.dreSel = [];
         else if (e.shiftKey && view.dreSelUlt) { const a = DRE_MESES.indexOf(view.dreSelUlt), b = DRE_MESES.indexOf(v); view.dreSel = DRE_MESES.slice(Math.min(a, b), Math.max(a, b) + 1); }

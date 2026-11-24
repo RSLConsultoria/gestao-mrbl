@@ -62,3 +62,24 @@ table.rel.dre tbody tr:nth-child(even):not(.totrow) td,
 table.rel.rep tbody tr:nth-child(even):not(.totrow) td{background-color:#F3F5FA}
 table.rel.dre tbody tr:not(.totrow):hover td,
 table.rel.rep tbody tr:not(.totrow):hover td{background-color:#E8ECF6}
+
+/* Fluxo de Caixa: visão comparativa */
+.cmpmodo{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px 0}
+.cmpmodo button{font:inherit;font-size:13.5px;font-weight:700;min-height:34px;padding:0 14px;border-radius:8px;cursor:pointer;border:1px solid var(--ctrl);background:var(--surface);color:var(--ink)}
+.cmpmodo button[aria-selected="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.cmpnota{margin:10px 16px 0;color:var(--muted);font-size:13px}.cmpnota b{color:var(--ink);font-weight:600}
+.cmpv{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted)}.cmpv.ok{color:var(--ok-ink)}.cmpv.bad{color:var(--danger-ink)}
+.kpi small .cmpv{font-size:12px}
+.cmptog{background:none;border:0;padding:4px 0;font:inherit;font-weight:inherit;cursor:pointer;color:inherit;text-align:left}
+tr.catrow .cmptog{font-weight:700}
+table.cmpt th:not(:first-child),table.cmpt td:not(:first-child){min-width:120px}
+.cmpimp{margin:12px 0;padding:16px 18px;border:1px dashed var(--ctrl);border-radius:12px;background:var(--surface)}
+.cmpimp h3{margin:0 0 6px;font-size:15px}.cmpimp p{margin:0 0 12px;color:var(--muted);font-size:13.5px;max-width:860px}
+.cmpimp label.btn{cursor:pointer}
+.cmpav{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+.cmpbt{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.cmpsub{margin:18px 0 8px}.cmpsub h2{margin:0;font-size:16px}
+.cmpleg{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px;margin-left:10px}.cmpleg i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.cmpleg .c26,.cmpstk .c26{background:var(--navy)}.cmpleg .c25,.cmpstk .c25{background:#B8C0D3}
+.cmpchart .cmpstk{display:flex;align-items:flex-end;justify-content:center;gap:3px}
+.cmpchart .cmpstk>span{display:block;width:42%;border-radius:3px 3px 0 0}
