@@ -55,3 +55,10 @@ table.dmes tr.subrow td{padding-top:2px;padding-bottom:2px}
 .dresel button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
 .dresel .dresel-todos{margin-left:6px}
 .dresel small{flex-basis:100%;color:var(--muted);font-size:12px}
+
+/* Fluxo de Caixa (anual e mensal) e Relatório: linhas listradas para facilitar a leitura.
+   As células com cor própria (mapa de calor do Relatório, dia de hoje) continuam com a cor delas. */
+table.rel.dre tbody tr:nth-child(even):not(.totrow) td,
+table.rel.rep tbody tr:nth-child(even):not(.totrow) td{background-color:#F3F5FA}
+table.rel.dre tbody tr:not(.totrow):hover td,
+table.rel.rep tbody tr:not(.totrow):hover td{background-color:#E8ECF6}
