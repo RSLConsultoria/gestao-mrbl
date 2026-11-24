@@ -125,8 +125,8 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   function logC(c, txt){ (c.log = c.log || []).push({ txt, em: agora(), por: S.user }); }
   const tipoMud = (c, para) => { const o = c.orig || c.data; return para > o ? 'Prorrogada' : para < o ? 'Antecipada' : 'Voltou ao vencimento original'; };
   function pagar(c, d){ const o = origOf(c); c.pago = true; c.pagoEm = d; logC(c, d < o ? 'Paga antecipada em ' + dmy(d) + ' (vencimento original ' + dm(o) + ')' : d > o ? 'Paga depois do vencimento original, em ' + dmy(d) + ' (vencia ' + dm(o) + ')' : 'Paga em ' + dmy(d) + ', no vencimento original'); }
-  // desfazer o pagamento também desfaz o "descartar do lançamento na DRE": ao pagar de novo, volta para lançar
-  function despagar(c){ c.pago = false; c.pagoEm = null; logC(c, 'Pagamento desfeito' + (c.dreSkip && !c.dreId ? '; ao pagar de novo volta para lançar na DRE' : '')); if (!c.dreId) c.dreSkip = false; }
+  // desfazer o pagamento também desfaz o "descartar do lançamento no Fluxo de Caixa": ao pagar de novo, volta para lançar
+  function despagar(c){ c.pago = false; c.pagoEm = null; logC(c, 'Pagamento desfeito' + (c.dreSkip && !c.dreId ? '; ao pagar de novo volta para lançar no Fluxo de Caixa' : '')); if (!c.dreId) c.dreSkip = false; }
   function syncOf(c){
     if (!isOf(c) || c.pago || c.payManual) return;
     c.data = payFrom(c.recebidoEm || c.entrega);
@@ -157,17 +157,17 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   // conta pode apontar a previsão que desconta (prevNome), sem mudar a categoria em que foi lançada
   const matchPrev = (p, c) => c.prevNome ? c.prevNome === p.nome : c.cat === p.cat && (!p.subs.length || p.subs.includes(c.sub));
   const prevsOf = (mk) => S.previsoes.filter((p) => p.mes === mk);
-  // Lançamentos feitos direto na DRE, sem conta em Contas a pagar (ex.: taxa de antecipação e empréstimo Seda, descontados
+  // Lançamentos feitos direto no Fluxo de Caixa, sem conta em Contas a pagar (ex.: taxa de antecipação e empréstimo Seda, descontados
   // quando o dinheiro entra). Contam como pagos no mês e descontam das previsões. Ficam de fora os que o sistema sugere
   // ligar a uma conta (senão contariam duas vezes) e o que é de antes do sistema.
   const DRE_AVULSA_DESDE = '2026-11-01';
   function dreAvulsas(){
     const sug = new Set(matchSug().map((x) => x.s.id));
     return S.saidas.filter((x) => !x.contaId && x.data >= DRE_AVULSA_DESDE && !sug.has(x.id))
-      .map((x) => Object.assign({}, x, { avulsa: true, pago: true, pagoEm: x.data, hist: [], forn: (x.forn || x.obs || 'Lançado direto na DRE') + ' · direto na DRE' }));
+      .map((x) => Object.assign({}, x, { avulsa: true, pago: true, pagoEm: x.data, hist: [], forn: (x.forn || x.obs || 'Lançado direto no Fluxo de Caixa') + ' · direto no Fluxo de Caixa' }));
   }
   // O que já está lançado no mês desconta da previsão: contas a pagar do mês (paga conta no mês em que foi paga)
-  // e lançamentos feitos direto na DRE.
+  // e lançamentos feitos direto no Fluxo de Caixa.
   const mesLanc = (c) => (c.pago ? (c.pagoEm || c.data) : c.data).slice(0,7);
   const lancPrev = (mk) => S.contas.filter(naPagar).filter((c) => mesLanc(c) === mk).concat(dreAvulsas().filter((x) => x.data.slice(0,7) === mk));
   const prevSaldo = (mk) => { const L = lancPrev(mk); return prevsOf(mk).reduce((a, p) => a + Math.max(0, p.valor - sum(L.filter((c) => matchPrev(p, c)))), 0); };
@@ -309,11 +309,11 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
         if (!hasDateLog) (c.hist || []).forEach((x, i) => ev.push({ t: tipoMud({ orig: c.orig, data: x.de }, x.para) + ' de ' + dm(x.de) + ' para ' + dmy(x.para), em: x.em, por: x.por, k: 'p' }));
         c.log.forEach((x) => { if (/^Criada/.test(x.txt)) ev[0].sub = x; else ev.push({ t: x.txt, em: x.em, por: x.por, k: kind(x.txt) }); });
         if (c.pago && !c.log.some((x) => /^Paga/.test(x.txt))) ev.splice(1, 0, { t: 'Paga em ' + dmy(c.pagoEm || c.data), k: 'g' });
-        if (c.dreId && !c.log.some((x) => /^Lançada/.test(x.txt))) ev.push({ t: 'Lançada na DRE', k: 'g' });
+        if (c.dreId && !c.log.some((x) => /^Lançada/.test(x.txt))) ev.push({ t: 'Lançada no Fluxo de Caixa', k: 'g' });
       } else {
         (c.hist || []).forEach((x) => { const t = tipoMud({ orig: c.orig, data: x.de }, x.para); ev.push({ t: (t === 'Voltou ao vencimento original' ? t + ', ' + dmy(x.para) : t + ' de ' + dm(x.de) + ' para ' + dmy(x.para)), em: x.em, por: x.por, k: kind(t) }); });
         if (c.pago) ev.push({ t: 'Paga em ' + dmy(c.pagoEm || c.data), k: 'g' });
-        if (c.dreId) ev.push({ t: 'Lançada na DRE', k: 'g' });
+        if (c.dreId) ev.push({ t: 'Lançada no Fluxo de Caixa', k: 'g' });
       }
       ev.forEach((x) => { if (x.k === 'g' && /antecipada/.test(x.t)) x.k = 'a'; });
       const tl = '<ol class="tl">' + ev.map((x, i) => '<li class="' + (/^Obs: /.test(x.t) ? 'n' : x.k) + (i === ev.length - 1 ? ' last' : '') + '">' + (/^Obs: /.test(x.t) ? '<span class="tln">' + esc(x.t.slice(5)) + '</span>' : '<b>' + esc(x.t) + '</b>') + (x.sub ? '<small>criada em ' + quando(x.sub.em) + (x.sub.por ? ' por <span class="who">' + esc(x.sub.por) + '</span>' : '') + '</small>' : '') + (x.em ? '<small>' + quando(x.em) + (x.por ? ' por <span class="who">' + esc(x.por) + '</span>' : '') + '</small>' : '') + '</li>').join('') + '</ol>';
@@ -835,10 +835,10 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   });
 
 
-  // ---------- DRE lançamentos: editar e excluir ----------
+  // ---------- Lançamentos de Caixa: editar e excluir ----------
   // Clique num lançamento abre o formulário. Salvar registra o que mudou (de → para) na linha do tempo do lançamento
   // e no log; Excluir pede confirmação. Despesa ligada a uma conta paga: ao excluir, a conta volta para "Pagos em
-  // Contas a pagar" (falta lançar na DRE).
+  // Contas a pagar" (falta lançar no Fluxo de Caixa).
   const lancById = (k, id) => (k === 'sai' ? S.saidas : S.entradas).find((x) => x.id === id);
   const LANC_CAMPOS = { sai: [['data', 'data'], ['cat', 'categoria'], ['sub', 'subcategoria'], ['emp', 'empresa'], ['valor', 'valor'], ['forn', 'fornecedor'], ['obs', 'observação']],
     ent: [['data', 'data'], ['cat', 'categoria'], ['cli', 'cliente'], ['nf', 'NF'], ['valor', 'valor'], ['obs', 'observação']] };
@@ -869,7 +869,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     return '<div class="modal-bg" data-modal-bg><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="mh"><h2 id="mt">' + (k === 'sai' ? 'Despesa' : 'Entrada') + ' · ' + esc(k === 'sai' ? (x.forn || x.sub || x.cat) : (x.cli || x.cat)) + ' · ' + money(x.valor) + '</h2>' + xBtn + '</div>' +
       '<div class="ebody"><div class="egrid"><div class="fbody">' + campos + nota + '</div><div class="tlbox"><h3>Linha do tempo</h3><div class="tlscroll">' + tl + '</div></div></div></div>' +
       '<div class="efoot"><span id="modalErr" class="err" role="alert"></span><div class="fact">' +
-      (view.lDel ? '<span style="font-size:13px;color:var(--danger-ink)">Deseja mesmo excluir este lançamento de ' + money(x.valor) + '? Ele sai da DRE.' + (c ? ' A conta volta para "Pagos em Contas a pagar".' : '') + '</span><button type="button" class="btn del" id="lDelOk">Sim, excluir</button><button type="button" class="btn" id="lDelNo">Não</button>'
+      (view.lDel ? '<span style="font-size:13px;color:var(--danger-ink)">Deseja mesmo excluir este lançamento de ' + money(x.valor) + '? Ele sai do Fluxo de Caixa.' + (c ? ' A conta volta para "Pagos em Contas a pagar".' : '') + '</span><button type="button" class="btn del" id="lDelOk">Sim, excluir</button><button type="button" class="btn" id="lDelNo">Não</button>'
         : '<button type="button" class="btn del ghost" id="lDel"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>Excluir</button>') +
       '<span class="grow"></span><button type="button" class="btn y" id="lSave">Salvar</button></div></div></div></div>';
   }
@@ -901,7 +901,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const quem = k === 'sai' ? (x.forn || x.sub || x.cat) : (x.cli || x.cat);
     act((k === 'sai' ? 'Despesa' : 'Entrada') + ' excluída: ' + quem + ' de ' + dmy(x.data) + ', ' + money(x.valor) + ' (' + x.cat + (x.sub ? ' · ' + x.sub : '') + ').', () => {
       if (k === 'sai') {
-        S.contas.forEach((c) => { if (c.dreId === x.id || c.id === x.contaId) { c.dreId = null; c.dreSkip = false; logC(c, 'Lançamento na DRE excluído (' + money(x.valor) + '); conta volta para "falta lançar na DRE"'); } });
+        S.contas.forEach((c) => { if (c.dreId === x.id || c.id === x.contaId) { c.dreId = null; c.dreSkip = false; logC(c, 'Lançamento no Fluxo de Caixa excluído (' + money(x.valor) + '); conta volta para "falta lançar no Fluxo de Caixa"'); } });
         S.saidas = S.saidas.filter((s) => s.id !== x.id);
       } else S.entradas = S.entradas.filter((s) => s.id !== x.id);
     });
@@ -927,7 +927,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     try { renderCore(); }
     catch (err) {
       console.error(err);
-      document.getElementById('app').innerHTML = '<div class="today"><h1>' + esc(({ pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório', dre: 'DRE', drel: 'DRE lançamentos', cfg: 'Configurações' })[view.tela] || '') + '</h1></div><section class="panel" style="padding:18px;border-color:var(--danger)"><b style="color:var(--danger-ink)">Esta tela não abriu.</b><p style="margin:6px 0;color:var(--muted);font-size:14px">Recarregue a página. Se continuar, mande um print desta mensagem para o Lucca. Detalhe técnico: <code>' + esc(String(err && err.message || err)) + '</code></p><button type="button" class="btn" onclick="location.reload()">Recarregar</button></section>';
+      document.getElementById('app').innerHTML = '<div class="today"><h1>' + esc(({ pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações' })[view.tela] || '') + '</h1></div><section class="panel" style="padding:18px;border-color:var(--danger)"><b style="color:var(--danger-ink)">Esta tela não abriu.</b><p style="margin:6px 0;color:var(--muted);font-size:14px">Recarregue a página. Se continuar, mande um print desta mensagem para o Lucca. Detalhe técnico: <code>' + esc(String(err && err.message || err)) + '</code></p><button type="button" class="btn" onclick="location.reload()">Recarregar</button></section>';
     }
     { const tt = document.getElementById('topTitle'); const td = document.querySelector('#app > .today'); tt.innerHTML = ''; if (td) tt.appendChild(td); }
     document.getElementById('modalHost').innerHTML = modalHTML();
@@ -1052,7 +1052,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
         return;
       }
       let chip;
-      if (c.pago) chip = '<span class="chip c-paid">✓ Pago' + (c.pagoEm && c.pagoEm < origOf(c) ? ' antecipado' : '') + ' ' + dm(c.pagoEm || c.data) + '</span>' + (c.dreId ? '<small style="display:block;color:var(--ok-ink);font-size:12px">lançado na DRE</small>' : '<small style="display:block;color:var(--warn-ink);font-size:12px;font-weight:700">falta lançar na DRE</small>');
+      if (c.pago) chip = '<span class="chip c-paid">✓ Pago' + (c.pagoEm && c.pagoEm < origOf(c) ? ' antecipado' : '') + ' ' + dm(c.pagoEm || c.data) + '</span>' + (c.dreId ? '<small style="display:block;color:var(--ok-ink);font-size:12px">lançado no Fluxo de Caixa</small>' : '<small style="display:block;color:var(--warn-ink);font-size:12px;font-weight:700">falta lançar no Fluxo de Caixa</small>');
       else if (isLate(c)) chip = '<span class="chip c-late">Vencida</span>';
       else if (isAnt(c)) chip = '<span class="chip c-ant">Antecipada de ' + dm(c.orig) + '</span>';
       else if (isPror(c)) chip = '<button type="button" class="chip c-pror" data-a="hist" style="border:0;cursor:pointer" title="Ver histórico de datas" aria-expanded="' + (view.histOpen === c.id) + '">Prorrogada de ' + dm(c.orig) + (nPror(c) > 1 ? ' · ' + nPror(c) + 'x' : '') + ' ▾</button>';
@@ -1102,7 +1102,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const pend = rows.filter((r) => !rv[r.k]);
     const n = histMonths().length;
     if (!pend.length) return '<div class="rvdone">' + cap(mesNome(closedMk)) + ' fechado: previsões dos próximos meses revisadas com a média. <button type="button" class="lnk" data-rv="reopen">Rever</button></div>';
-    let h = '<div class="rv" role="region" aria-label="Revisão das previsões"><div class="rvh"><div><b>' + cap(mesNome(closedMk)) + ' fechou. Atualizar as previsões futuras pela média?</b><small>Média dos últimos ' + n + (n === 1 ? ' mês fechado' : ' meses fechados') + ' na DRE' + (n < 12 ? ' (vai até 12 conforme o histórico cresce)' : '') + '. ' + cap(mesNome(CUR)) + ' e os meses passados não mudam.</small></div>' +
+    let h = '<div class="rv" role="region" aria-label="Revisão das previsões"><div class="rvh"><div><b>' + cap(mesNome(closedMk)) + ' fechou. Atualizar as previsões futuras pela média?</b><small>Média dos últimos ' + n + (n === 1 ? ' mês fechado' : ' meses fechados') + ' no Fluxo de Caixa' + (n < 12 ? ' (vai até 12 conforme o histórico cresce)' : '') + '. ' + cap(mesNome(CUR)) + ' e os meses passados não mudam.</small></div>' +
       '<div class="rvb"><button type="button" class="btn sm y" data-rv="allAvg">Usar média em todas</button><button type="button" class="btn sm" data-rv="allKeep">Manter todas</button></div></div><table class="rvt"><thead><tr><th>Previsão</th><th>Meses</th><th class="r">Atual</th><th class="r">Média</th><th class="r">Diferença</th><th></th></tr></thead><tbody>';
     pend.forEach((r) => {
       const cur = r.fut.length ? r.fut[0].valor : r.base.valor, d = r.avg - cur;
@@ -1141,7 +1141,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const us = S.usuarios, f = view.logUser || '', q = (view.logQ || '').trim().toUpperCase();
     const L = (S.logs || []).filter((x) => (!f || x.por === f) && (!q || x.txt.toUpperCase().includes(q)));
     const nPg = Math.max(1, Math.ceil(L.length / 15)); const pg = Math.min(view.logPg || 0, nPg - 1); view.logPg = pg;
-    const TELA = { pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório', dre: 'DRE', drel: 'DRE lançamentos', cfg: 'Configurações', login: 'Login' };
+    const TELA = { pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações', login: 'Login' };
     let h = '<div class="lgrid"><section class="panel lpane"><div class="lhead"><div><h2>Usuários</h2><small>Quem está logado: <b>' + esc(S.user) + '</b>. Cada um entra com a própria senha.</small></div></div><table class="ltab utab"><tbody>' +
       us.map((u) => '<tr><td>' + esc(u) + (u === S.user ? ' <span class="chip c-open" style="margin-left:6px">usando agora</span>' : '') + '</td><td class="r">' + (S.senhas && S.senhas[u] ? (ADMIN ? '<button type="button" class="btn sm" data-resetpw="' + esc(u) + '" title="Apaga a senha e gera um código de convite. A pessoa cria outra senha com esse código.">Redefinir senha</button>' : '') : '<small style="color:var(--muted)">sem senha ainda' + (S.convites[u] ? ' · convite <b class="num">' + esc(S.convites[u]) + '</b>' : '') + '</small>') + '</td></tr>').join('') +
       (ADMIN ? '<tr class="ladd"><td><input id="uNome" placeholder="Novo usuário" autocomplete="off"></td><td class="r"><button type="button" class="btn sm y" id="uAdd">Adicionar</button></td></tr>' : '') + '</tbody></table></section>';
@@ -1172,7 +1172,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const vazio = {}; months.forEach((mk) => { vazio[mk] = mk < CUR && !rows.some((r) => r.m[mk] || gastoMes(r.base, mk)); });
     let h = '<section class="panel pvpane">';
     h += '<div class="pvtop"><div class="mnav"><button type="button" class="nav" data-pvy="-1" aria-label="Ano anterior">‹</button><h2>' + y + '</h2><button type="button" class="nav" data-pvy="1" aria-label="Próximo ano">›</button></div>' +
-      '<p>Edite qualquer mês de ' + mesNome(CUR) + ' em diante. Os meses que já passaram ficam travados e mostram o que foi gasto de fato. A média usa os últimos ' + n + ' meses fechados da DRE.</p>' +
+      '<p>Edite qualquer mês de ' + mesNome(CUR) + ' em diante. Os meses que já passaram ficam travados e mostram o que foi gasto de fato. A média usa os últimos ' + n + ' meses fechados do Fluxo de Caixa.</p>' +
       '<div class="pvacts"><button type="button" class="btn sm" data-pva="modelo">Baixar modelo Excel</button><button type="button" class="btn sm y" data-pva="importar">Importar Excel</button><input type="file" id="pvFile" accept=".xlsx" hidden><button type="button" class="btn sm" data-pva="fillAll">Preencher meses vazios com o mês anterior</button><button type="button" class="btn sm" data-pva="avgAll">Usar a média em todos os meses futuros</button></div></div>';
     if (reviewPending() && !view.rvOpen) h += '<div class="rvnote" style="margin:14px 18px 0">' + cap(mesNome(closedMk)) + ' fechou: ' + reviewRows().filter((r) => !(S.prevReview[closedMk] || {})[r.k]).length + ' previsões têm sugestão pela média para os próximos meses.<button type="button" class="btn sm y" data-rvopen>Ver sugestões</button></div>';
     else h += reviewHTML();
@@ -1553,7 +1553,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       '<button type="button" class="btn sm" data-dre="mes:1"' + (mi >= DRE_MESES.length - 1 ? ' disabled' : '') + ' aria-label="Próximo mês">›</button></div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn sm" data-dre="aberto:1">Abrir todas</button><button type="button" class="btn sm" data-dre="aberto:0">Fechar todas</button></div></div>';
     if (!temDia) {
-      h += '<div class="hint" style="padding:16px"><span>' + (mi < 6 ? 'Janeiro a junho só existem consolidados por mês (aba DRE 2026 da planilha), sem os lançamentos dia a dia. Veja esses meses na visão anual.' : 'Nenhum lançamento da DRE neste mês ainda.') + '</span></div></section>';
+      h += '<div class="hint" style="padding:16px"><span>' + (mi < 6 ? 'Janeiro a junho só existem consolidados por mês (aba DRE 2026 da planilha), sem os lançamentos dia a dia. Veja esses meses na visão anual.' : 'Nenhum lançamento do Fluxo de Caixa neste mês ainda.') + '</span></div></section>';
       return h;
     }
     const ini = D.ini[mi];
@@ -1628,8 +1628,8 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const sumA = (a) => a.reduce((x,y) => x+y, 0);
     const cell = (v, neg) => '<td class="r num"' + (v < 0 ? ' style="color:var(--danger-ink)"' : '') + '>' + (v ? (v < 0 ? '−' : '') + num(Math.abs(v)) : '') + '</td>';
     const line = (label, arr, cls, tog, total) => '<tr class="' + (cls || 'catrow') + '"><td>' + (tog ? '<button type="button" data-dre="tog:' + esc(tog) + '" style="background:none;border:0;padding:6px 0;font-weight:700;cursor:pointer;color:var(--ink);text-align:left">' + (view.dreOpen[tog] ? '▾ ' : '▸ ') + label + '</button>' : label) + '</td>' + arr.map((v) => cell(v)).join('') + (total === false ? '<td></td>' : cell(sumA(arr))) + '</tr>';
-    let h = '<section class="today"><h1>DRE</h1><span class="sub">Regime de caixa: entradas recebidas e contas pagas, no mês do pagamento. Recebimento MRBL e Recebimento STOFFA ficam de fora.</span></section>';
-    h += '<section class="panel"><div class="ph"><div style="color:var(--muted);font-size:14px">Só lançamentos consolidados da DRE. Contas a pagar não entram aqui.</div>' +
+    let h = '<section class="today"><h1>Fluxo de Caixa</h1><span class="sub">Regime de caixa: entradas recebidas e contas pagas, no mês do pagamento. Recebimento MRBL e Recebimento STOFFA ficam de fora.</span></section>';
+    h += '<section class="panel"><div class="ph"><div style="color:var(--muted);font-size:14px">Só lançamentos consolidados do Fluxo de Caixa. Contas a pagar não entram aqui.</div>' +
       '<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" data-dre="modo:anual" style="' + seg(view.dreModo !== 'mensal') + '">Visão anual</button><button type="button" data-dre="modo:mensal" style="' + seg(view.dreModo === 'mensal') + '">Visão mensal</button><button type="button" class="btn sm" data-tela="drel">Ver lançamentos</button></div></div>';
     if (view.dreModo === 'mensal') { sbCalc = null; h += dreMensalHTML(D, sumA); app.innerHTML = h; sbAtualiza(); return; }
     const parcial = (k) => k === HOJE.slice(0,7) ? ' (parcial)' : '';
@@ -1647,7 +1647,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     h += '<div class="chart" style="height:180px">' + DRE_MESES.map((k, i) => '<div class="bar" style="cursor:default" title="' + lab(k) + parcial(k) + ': ' + money(fat[i]) + ' · acumulado ' + money(acc[i]) + '"><span class="val num">' + (fat[i] ? short(fat[i]) : '—') + '</span><span class="stack"><span style="display:block;height:' + (fat[i] ? Math.max(3, fat[i] / fm * 130).toFixed(1) : 0) + 'px;background:var(--navy);border-radius:3px 3px 0 0"></span></span></div>').join('') + '</div>';
     h += '<div class="xlabels">' + DRE_MESES.map((k, i) => { const pv = i ? fat[i-1] : 0; const pc = pv && fat[i] ? (fat[i] / pv - 1) * 100 : null; return '<span>' + lab(k) + (parcial(k) ? '*' : '') + '<br>' + (pc == null ? '<small style="color:var(--muted)">—</small>' : '<b class="num" style="color:' + (pc < 0 ? 'var(--danger-ink)' : 'var(--ok-ink)') + '">' + (pc < 0 ? '▼ ' : '▲ ') + Math.abs(pc).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%</b>') + '<br><small class="num" style="color:var(--muted)">' + (fat[i] ? 'acum. ' + short(acc[i]) : '') + '</small></span>'; }).join('') + '</div><div style="height:14px"></div></section>';
     // tabela
-    h += '<section class="panel"><div class="drescroll"><table class="rel dre"><thead><tr><th>DRE gerencial</th>' + DRE_MESES.map((k) => '<th class="r">' + lab(k) + '</th>').join('') + '<th class="r">Acumulado 2026</th></tr></thead><tbody>';
+    h += '<section class="panel"><div class="drescroll"><table class="rel dre"><thead><tr><th>Fluxo de Caixa</th>' + DRE_MESES.map((k) => '<th class="r">' + lab(k) + '</th>').join('') + '<th class="r">Acumulado 2026</th></tr></thead><tbody>';
     h += line('Saldo inicial', D.ini, 'subrow', null, false);
     h += line('Recebimentos', D.rec, 'catrow', 'rec');
     if (view.dreOpen.rec) Object.keys(D.recCat).forEach((k) => { h += '<tr class="subrow"><td style="padding-left:28px;color:var(--muted)">' + esc(k) + '</td>' + D.recCat[k].map((v) => cell(v)).join('') + cell(sumA(D.recCat[k])) + '</tr>'; });
@@ -1662,7 +1662,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     h += line('Lucro líquido', D.lucro, 'totrow');
     h += line('Resultado com saldo inicial', D.fim, 'totrow', null, false);
     h += '<tr class="subrow"><td>Saldo nos bancos <small style="color:var(--muted)">(último dia informado)</small></td>' + DRE_MESES.map((k) => { const u = ultimoSaldo(k); return u ? '<td class="r num" title="Informado em ' + dm(u.d) + '">' + (u.v < 0 ? '−' : '') + num(Math.abs(u.v)) + '<br><small style="color:var(--muted);font-weight:400">' + dm(u.d) + '</small></td>' : '<td></td>'; }).join('') + '<td></td></tr>';
-    h += '</tbody></table></div><div class="hint"><span>De julho em diante, despesas e recebimentos vêm de DRE lançamentos (BASE_DESPESAS e BASE_ENTRADAS da planilha V2_12); janeiro a junho vêm consolidados da aba DRE 2026, porque a base começa em julho. O faturamento da planilha do Cesar é lançado lá à mão. Saldo inicial de janeiro: ' + money(DRE_HIST.saldoJan) + ' e de julho: ' + money(+(CFG.saldoJul || 0)) + ', como na planilha.</span></div></section>';
+    h += '</tbody></table></div><div class="hint"><span>De julho em diante, despesas e recebimentos vêm de Lançamentos de Caixa (BASE_DESPESAS e BASE_ENTRADAS da planilha V2_12); janeiro a junho vêm consolidados da aba DRE 2026, porque a base começa em julho. O faturamento da planilha do Cesar é lançado lá à mão. Saldo inicial de janeiro: ' + money(DRE_HIST.saldoJan) + ' e de julho: ' + money(+(CFG.saldoJul || 0)) + ', como na planilha.</span></div></section>';
     h += '<div class="foot"><span id="copyOut"></span></div>';
     app.innerHTML = h;
   }
@@ -1671,7 +1671,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const mk = view.drelMes, mm = parseInt(mk.slice(5),10);
     const ent = S.entradas.filter((e) => e.data.slice(0,7) === mk).sort((a,b) => b.data.localeCompare(a.data));
     const sai = S.saidas.filter((x) => x.data.slice(0,7) === mk).sort((a,b) => b.data.localeCompare(a.data));
-    // separação por dia: cabeçalho com o que entrou (só o que entra na DRE) e o que saiu no dia
+    // separação por dia: cabeçalho com o que entrou (só o que entra no Fluxo de Caixa) e o que saiu no dia
     const diaTot = (d) => { const en = ent.filter((e) => e.data === d && !EXCL_ENT.includes(e.cat)).reduce((a, e) => a + e.valor, 0), sa = sai.filter((x) => x.data === d).reduce((a, x) => a + x.valor, 0); return { en, sa }; };
     const diaHead = (d) => { const t = diaTot(d), sd = t.en - t.sa; return '<tr class="dayhead' + (d === HOJE ? ' istoday' : '') + '"><td colspan="7">' + DIAS[parse(d).getDay()] + ', ' + dm(d) + '<span class="s">entrou <b>' + money(t.en) + '</b> · saiu <b>' + money(t.sa) + '</b> · saldo do dia <b style="color:' + (sd < 0 ? 'var(--danger-ink)' : 'var(--ok-ink, #1b7a4b)') + '">' + (sd < 0 ? '−' : '') + money(Math.abs(sd)) + '</b></span></td></tr>'; };
     const naDre = sum(ent.filter((e) => !EXCL_ENT.includes(e.cat)));
@@ -1679,7 +1679,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const F = view.dForm, E = view.eForm;
     const fld = (lab, ctl) => '<label class="ff"><span>' + lab + '</span>' + ctl + '</label>';
     const opt = (arr, sel) => arr.map((k) => '<option' + (k === sel ? ' selected' : '') + '>' + esc(k) + '</option>').join('');
-    let h = '<section class="today"><h1>DRE · lançamentos</h1><span class="sub">O que foi pago e recebido de verdade. É isto que forma a DRE. O faturamento vem da planilha do Cesar.</span></section>';
+    let h = '<section class="today"><h1>Lançamentos de Caixa</h1><span class="sub">O que foi pago e recebido de verdade. É isto que forma o Fluxo de Caixa. O faturamento vem da planilha do Cesar.</span></section>';
 
     // formulários lado a lado, como a aba NOVO LANÇAMENTO
     const link = F.contaId ? S.contas.find((c) => c.id === F.contaId) : null;
@@ -1694,9 +1694,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       fld('Observação', '<input id="dObs" value="' + esc(F.obs) + '">') +
       (link ? '<div class="linked">Vinculada a <b>' + esc(link.forn) + '</b> (' + money(link.valor) + (link.pago ? ', paga ' + dm(link.pagoEm || link.data) + '). Ao registrar, fica ligada a este lançamento.' : ', vence ' + dm(link.data) + '). Ao registrar, a conta é marcada como paga.') + ' <button type="button" class="lnk" data-df="unlink">Desvincular</button></div>' : '') +
       '<div class="fact"><button type="button" class="btn" id="btnRegD">Registrar despesa</button><span class="status">' + esc(view.dStatus || '') + '</span></div></div></section>';
-    // pagos em Contas a pagar: só sugestão. Nada vai para a DRE sem alguém conferir e registrar.
+    // pagos em Contas a pagar: só sugestão. Nada vai para o Fluxo de Caixa sem alguém conferir e registrar.
     const pagos = S.contas.filter((c) => c.pago && !c.dreId && !c.dreSkip && c.id !== F.contaId).sort((a,b) => (b.pagoEm || b.data).localeCompare(a.pagoEm || a.data));
-    const pagH = '<section class="panel pgpane"><div class="ph"><div><h2>Pagos em Contas a pagar</h2><small>Falta lançar na DRE · ' + pagos.length + '. Usar preenche a nova despesa para conferir e registrar; Descartar tira daqui sem lançar.</small></div></div><div class="pglist">' +
+    const pagH = '<section class="panel pgpane"><div class="ph"><div><h2>Pagos em Contas a pagar</h2><small>Falta lançar no Fluxo de Caixa · ' + pagos.length + '. Usar preenche a nova despesa para conferir e registrar; Descartar tira daqui sem lançar.</small></div></div><div class="pglist">' +
       (pagos.length ? pagos.map((c) => '<div class="pgrow' + (F.contaId === c.id ? ' on' : '') + '"><div class="pgt"><b>' + esc(c.forn) + '</b><span class="num">' + num(c.valor) + '</span></div><small>pago ' + dm(c.pagoEm || c.data) + ' · ' + esc(c.cat || 'sem categoria') + (c.sub ? ' · ' + esc(c.sub) : '') + '</small><div class="pga"><button type="button" class="btn sm pri" data-usep="' + c.id + '">Usar</button><button type="button" class="btn sm" data-pgx="' + c.id + '">Descartar</button></div></div>').join('')
         : '<p class="empty" style="margin:0;padding:24px 16px">Tudo o que foi pago em Contas a pagar já foi lançado ou descartado.</p>') + '</div></section>';
     const fE = '<section class="panel fcard fent"><div class="ph"><h2>Nova entrada</h2></div><div class="fbody">' +
@@ -1713,7 +1713,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     // tabelas do mês
     h += '<section class="panel"><div class="ph"><div class="mnav"><button type="button" class="nav" data-drel="mes:-1" aria-label="Mês anterior">‹</button><h2 style="min-width:190px;text-align:center">' + MESES[mm-1].replace(/^./, (x) => x.toUpperCase()) + ' de ' + mk.slice(0,4) + '</h2><button type="button" class="nav" data-drel="mes:1" aria-label="Próximo mês">›</button>' +
       '<span style="width:12px"></span><button type="button" data-drel="tab:sai" style="' + seg(view.drelTab === 'sai') + '">Despesas · ' + sai.length + '</button><button type="button" data-drel="tab:ent" style="' + seg(view.drelTab === 'ent') + '">Entradas · ' + ent.length + '</button></div>' +
-      '<div class="stats"><div class="stat"><span class="lbl">Despesas</span><b class="num">' + money(sum(sai)) + '</b></div><div class="stat"><span class="lbl">Entradas</span><b class="num">' + money(sum(ent)) + '</b></div><div class="stat"><span class="lbl">Entradas na DRE</span><b class="num">' + money(naDre) + '</b></div></div></div>';
+      '<div class="stats"><div class="stat"><span class="lbl">Despesas</span><b class="num">' + money(sum(sai)) + '</b></div><div class="stat"><span class="lbl">Entradas</span><b class="num">' + money(sum(ent)) + '</b></div><div class="stat"><span class="lbl">Entradas no Fluxo de Caixa</span><b class="num">' + money(naDre) + '</b></div></div></div>';
     const sm = (t) => '<small style="display:block;color:var(--muted)">' + esc(t) + '</small>';
     if (view.drelTab === 'sai') {
       h += '<div class="dhist"><table><thead><tr><th style="width:56px">Data</th><th style="width:22%">Fornecedor / descrição</th><th style="width:30%">Categoria · subcategoria</th><th style="width:80px">Empresa</th><th class="r" style="width:104px">Valor</th><th style="width:66px">Resp.</th><th>Observação</th></tr></thead><tbody>';
@@ -1722,7 +1722,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     } else {
       h += '<div class="dhist"><table><thead><tr><th style="width:56px">Data</th><th style="width:24%">Categoria</th><th style="width:22%">Cliente</th><th style="width:14%">NF</th><th class="r" style="width:110px">Valor</th><th style="width:66px">Resp.</th><th>Observação</th></tr></thead><tbody>';
       if (!ent.length) h += '<tr><td colspan="7" class="empty">Nenhuma entrada lançada neste mês.</td></tr>';
-      let dAnt = null; ent.forEach((x) => { const fora = EXCL_ENT.includes(x.cat); if (x.data !== dAnt) { dAnt = x.data; h += diaHead(x.data); } h += '<tr class="clk" data-lanc="ent:' + x.id + '" title="Clique para editar ou excluir"' + (fora ? ' style="opacity:.75"' : '') + '><td class="num">' + dm(x.data) + '</td><td>' + esc(x.cat) + (fora ? sm('não entra na DRE') : '') + '</td><td>' + esc(x.cli || '—') + '</td><td>' + esc(x.nf || '') + '</td><td class="r num">' + num(x.valor) + '</td><td>' + esc(x.resp || '—') + '</td><td style="color:var(--muted)">' + esc(x.obs || '') + '</td></tr>'; });
+      let dAnt = null; ent.forEach((x) => { const fora = EXCL_ENT.includes(x.cat); if (x.data !== dAnt) { dAnt = x.data; h += diaHead(x.data); } h += '<tr class="clk" data-lanc="ent:' + x.id + '" title="Clique para editar ou excluir"' + (fora ? ' style="opacity:.75"' : '') + '><td class="num">' + dm(x.data) + '</td><td>' + esc(x.cat) + (fora ? sm('não entra no Fluxo de Caixa') : '') + '</td><td>' + esc(x.cli || '—') + '</td><td>' + esc(x.nf || '') + '</td><td class="r num">' + num(x.valor) + '</td><td>' + esc(x.resp || '—') + '</td><td style="color:var(--muted)">' + esc(x.obs || '') + '</td></tr>'; });
     }
     h += '</tbody></table></div><div class="hint"><span>Clique num lançamento para editar ou excluir. Toda mudança fica na linha do tempo do lançamento e no log, com o nome de quem fez.</span></div></section>';
     h += '</div></div>';
@@ -1740,14 +1740,14 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     });
     return out;
   }
-  const linkPay = (s, c) => { if (!c.pago) pagar(c, s.data); else c.pagoEm = s.data; logC(c, 'Lançada na DRE'); c.pagoEm = s.data; c.dreId = s.id; s.contaId = c.id; };
+  const linkPay = (s, c) => { if (!c.pago) pagar(c, s.data); else c.pagoEm = s.data; logC(c, 'Lançada no Fluxo de Caixa'); c.pagoEm = s.data; c.dreId = s.id; s.contaId = c.id; };
   function regDespesa(){
     const F = view.dForm; const v = parseVal(F.valor);
     if (!F.data || !F.cat || isNaN(v) || v <= 0) { view.dStatus = 'Preencha data, categoria e valor.'; render(); return; }
     const s = { id: novoId('s'), data: F.data, cat: F.cat, sub: F.sub, emp: F.emp, valor: v, forn: F.forn.trim(), resp: S.user, obs: F.obs.trim(), contaId: null };
     const c = F.contaId ? S.contas.find((x) => x.id === F.contaId) : null;
     const hora = new Date().toLocaleTimeString('pt-BR');
-    act('Despesa de ' + money(v) + ' registrada na DRE' + (c ? '. ' + c.forn + ' marcada como paga.' : '.') + (s.forn ? novoTxt(s.forn, s.cat, s.sub) : ''), () => { S.saidas.push(s); if (c) linkPay(s, c); if (s.forn) ensureForn(s.forn, s.cat, s.sub); });
+    act('Despesa de ' + money(v) + ' registrada no Fluxo de Caixa' + (c ? '. ' + c.forn + ' marcada como paga.' : '.') + (s.forn ? novoTxt(s.forn, s.cat, s.sub) : ''), () => { S.saidas.push(s); if (c) linkPay(s, c); if (s.forn) ensureForn(s.forn, s.cat, s.sub); });
     view.dStatus = '✅ Despesa registrada às ' + hora + (c ? ' · ligada à conta ' + c.forn : '');
     view.dForm = Object.assign(blankD(), { data: F.data, resp: F.resp });
     render();
@@ -1757,7 +1757,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (!E.data || isNaN(v) || v <= 0) { view.eStatus = 'Preencha data e valor.'; render(); return; }
     const en = { id: novoId('e'), data: E.data, cat: E.cat, cli: E.cli.trim(), nf: E.nf.trim(), valor: v, resp: S.user, obs: E.obs.trim() };
     const hora = new Date().toLocaleTimeString('pt-BR');
-    act('Entrada de ' + money(v) + ' registrada' + (EXCL_ENT.includes(en.cat) ? '. Ela não conta na DRE.' : '.'), () => { S.entradas.push(en); });
+    act('Entrada de ' + money(v) + ' registrada' + (EXCL_ENT.includes(en.cat) ? '. Ela não conta no Fluxo de Caixa.' : '.'), () => { S.entradas.push(en); });
     view.eStatus = '✅ Entrada registrada às ' + hora;
     view.eForm = Object.assign(blankE(), { data: E.data, resp: E.resp });
     render();
@@ -1781,7 +1781,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       if (e.target.id === 'oeUnrec') { act('Chegada de ' + c.forn + ' desfeita. O pagamento volta a contar da entrega prevista (' + dm(payFrom(c.entrega)) + ').', () => { marcarChegada(c, null); view.oed.rec = ''; }); return; }
       if (e.target.id === 'oeRecBtn') { openCal(e.target, { commit: true, max: HOJE, value: HOJE, onPick: (d) => act(c.forn + ' chegou em ' + dm(d) + '.', () => { marcarChegada(c, d); view.oed.rec = d; }) }); return; }
       if (e.target.id === 'oePay') { openCal(e.target, { commit: true, max: HOJE, value: HOJE, onPick: (d) => act(c.forn + ' paga em ' + dm(d) + '.', () => pagar(c, d)) }); return; }
-      if (e.target.id === 'oeUnpay') { if (c.dreId) { toast('Essa conta já está lançada na DRE. Remova o lançamento em DRE lançamentos para desfazer.', false); return; } act('Pagamento de ' + c.forn + ' desfeito.', () => despagar(c)); return; }
+      if (e.target.id === 'oeUnpay') { if (c.dreId) { toast('Essa conta já está lançada no Fluxo de Caixa. Remova o lançamento em Lançamentos de Caixa para desfazer.', false); return; } act('Pagamento de ' + c.forn + ' desfeito.', () => despagar(c)); return; }
       if (e.target.id === 'eDel') { view.edDel = true; render(); return; }
       if (e.target.id === 'eDelNo') { view.edDel = false; render(); return; }
       if (e.target.id === 'eDelOk') { view.modal = null; act(c.forn + ' excluída.', () => { S.contas = S.contas.filter((x) => x !== c); }); return; }
@@ -1799,7 +1799,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (view.modal === 'edit') { const c = byId(view.editId);
       if (e.target.id === 'eSave') { saveEdit(c); return; }
       if (e.target.id === 'ePay') { openCal(e.target, { commit: true, max: HOJE, value: HOJE, onPick: (d) => act(c.forn + ' paga em ' + dm(d) + '.', () => pagar(c, d)) }); return; }
-      if (e.target.id === 'eUnpay') { if (c.dreId) { toast('Essa conta já está lançada na DRE. Remova o lançamento em DRE lançamentos para desfazer.', false); return; } act('Pagamento de ' + c.forn + ' desfeito.', () => despagar(c)); view.ed.data = c.data; return; }
+      if (e.target.id === 'eUnpay') { if (c.dreId) { toast('Essa conta já está lançada no Fluxo de Caixa. Remova o lançamento em Lançamentos de Caixa para desfazer.', false); return; } act('Pagamento de ' + c.forn + ' desfeito.', () => despagar(c)); view.ed.data = c.data; return; }
       if (e.target.id === 'eDel') { view.edDel = true; render(); return; }
       if (e.target.id === 'eDelNo') { view.edDel = false; render(); return; }
       if (e.target.id === 'eDelOk') { view.modal = null; act(c.forn + ' excluída.', () => { S.contas = S.contas.filter((x) => x !== c); }); return; }
@@ -1809,14 +1809,14 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       const row = b.closest('[data-id]'); const c = row && byId(row.dataset.id); if (!c) return;
       const a = b.dataset.a;
       if (a === 'prorPick') { openCal(b, { commit: true, min: HOJE, title: 'Prorrogar ' + c.forn + ' para', onPick: (d) => act(c.forn + ' prorrogada para ' + dm(d) + (weekOf(d) !== view.week ? ', semana de ' + weekLabel(weekOf(d)) : '') + '.', () => setDate(c, d)) }); return; }
-      if (a === 'pay') { openCal(b, { commit: true, max: HOJE, value: HOJE, onPick: (d) => act(c.forn + ' paga em ' + dm(d) + '. Ela aparece em DRE lançamentos para lançar.', () => pagar(c, d)) }); return; }
+      if (a === 'pay') { openCal(b, { commit: true, max: HOJE, value: HOJE, onPick: (d) => act(c.forn + ' paga em ' + dm(d) + '. Ela aparece em Lançamentos de Caixa para lançar.', () => pagar(c, d)) }); return; }
       if (a === 'payOld') { view.paying = c.id; view.payWhere = b.closest('.venc-row') ? 'top' : 'tbl'; view.removing = null; render(); const d = document.getElementById('payDate'); if (d) d.focus(); }
-      if (a === 'payOk') { const pi = b.parentElement.querySelector('input[type=date]'); const d = (pi && pi.value) || HOJE; act(c.forn + ' paga em ' + dm(d) + '. Ela aparece em DRE lançamentos para lançar.', () => pagar(c, d)); }
+      if (a === 'payOk') { const pi = b.parentElement.querySelector('input[type=date]'); const d = (pi && pi.value) || HOJE; act(c.forn + ' paga em ' + dm(d) + '. Ela aparece em Lançamentos de Caixa para lançar.', () => pagar(c, d)); }
       if (a === 'cancel') { view.paying = view.removing = view.proring = null; render(); }
       if (a === 'prorOpen') { view.proring = c.id; view.paying = view.removing = null; render(); const d = document.getElementById('prorNew'); if (d) d.focus(); }
       if (a === 'prorOk') { const d = document.getElementById('prorNew').value; if (!d || d < HOJE) { toast('Escolha uma data a partir de hoje.', false); return; } act(c.forn + ' prorrogada para ' + dm(d) + (weekOf(d) !== view.week ? ', semana de ' + weekLabel(weekOf(d)) : '') + '.', () => setDate(c, d)); }
       if (a === 'hist') { view.histOpen = view.histOpen === c.id ? null : c.id; render(); }
-      if (a === 'unpay') { if (c.dreId) { toast('Essa conta já está lançada na DRE. Remova o lançamento em DRE lançamentos para desfazer.', false); return; } act('Pagamento de ' + c.forn + ' desfeito.', () => despagar(c)); }
+      if (a === 'unpay') { if (c.dreId) { toast('Essa conta já está lançada no Fluxo de Caixa. Remova o lançamento em Lançamentos de Caixa para desfazer.', false); return; } act('Pagamento de ' + c.forn + ' desfeito.', () => despagar(c)); }
       if (a === 'pror') act(c.forn + ' prorrogada para ' + dm(b.dataset.d) + '.', () => setDate(c, b.dataset.d));
       if (a === 'del') { view.removing = c.id; view.paying = null; render(); }
       if (a === 'delOk') act(c.forn + ' removida.', () => { S.contas = S.contas.filter((x) => x !== c); });
@@ -1883,12 +1883,12 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (xb) { const row = xb.closest('[data-xid]'); const L = row.dataset.xk === 'sai' ? 'saidas' : 'entradas'; const it = S[L].find((x) => x.id === row.dataset.xid); const a = xb.dataset.x;
       if (a === 'del') { view.removing = it.id; render(); }
       if (a === 'cancel') { view.removing = null; render(); }
-      if (a === 'delOk') act((L === 'saidas' ? 'Despesa' : 'Entrada') + ' removida da DRE.', () => { if (it.contaId) { const c = S.contas.find((x) => x.id === it.contaId); if (c) { despagar(c); c.dreId = null; logC(c, 'Lançamento da DRE removido'); } } S[L] = S[L].filter((x) => x !== it); });
+      if (a === 'delOk') act((L === 'saidas' ? 'Despesa' : 'Entrada') + ' removida do Fluxo de Caixa.', () => { if (it.contaId) { const c = S.contas.find((x) => x.id === it.contaId); if (c) { despagar(c); c.dreId = null; logC(c, 'Lançamento do Fluxo de Caixa removido'); } } S[L] = S[L].filter((x) => x !== it); });
       return; }
     const up = e.target.closest('[data-usep]');
     if (up) { const c = S.contas.find((x) => x.id === up.dataset.usep); view.dForm = Object.assign({}, view.dForm, { contaId: c.id, data: c.pagoEm || c.data, cat: c.cat, sub: c.sub, valor: num(c.valor), forn: c.forn }); view.dStatus = ''; render(); return; }
     const pgx = e.target.closest('[data-pgx]');
-    if (pgx) { const c = S.contas.find((x) => x.id === pgx.dataset.pgx); act(c.forn + ' (' + money(c.valor) + ') descartado do lançamento na DRE.', () => { c.dreSkip = true; logC(c, 'Descartada do lançamento na DRE'); }); return; }
+    if (pgx) { const c = S.contas.find((x) => x.id === pgx.dataset.pgx); act(c.forn + ' (' + money(c.valor) + ') descartado do lançamento no Fluxo de Caixa.', () => { c.dreSkip = true; logC(c, 'Descartada do lançamento no Fluxo de Caixa'); }); return; }
     const us = e.target.closest('[data-use]');
     if (us) { const c = S.contas.find((x) => x.id === us.dataset.use); view.dForm = Object.assign({}, view.dForm, { contaId: c.id, data: c.data < HOJE ? HOJE : view.dForm.data, cat: c.cat, sub: c.sub, valor: num(c.valor), forn: c.forn }); view.dStatus = ''; render(); return; }
     if (e.target.closest('[data-df="unlink"]')) { view.dForm.contaId = null; render(); return; }
@@ -2060,7 +2060,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const tAnt = ant ? sel.reduce((a, m) => a + (antTot(m) || 0), 0) : null;
     const max = Math.max(1, ...D.map((o) => Math.max(o.tot, antTot(o.m) || 0)));
     const pc = (v) => (v / max * 100).toFixed(2) + '%';
-    let p1 = '<h1>Previsão de saídas · ' + periodo + '</h1><p class="sub">MRBL · emitido em ' + dmy(HOJE) + ' às ' + agora().slice(11, 16) + ' por ' + esc(S.user) + (dreAte ? ' · DRE lançada até ' + dm(dreAte) : '') + '<br>' + (ant ? 'Comparado com o último PDF baixado, em ' + esc(antQuando) + '.' : 'Primeiro PDF: os próximos vão marcar o que mudou a partir deste.') + '</p>';
+    let p1 = '<h1>Previsão de saídas · ' + periodo + '</h1><p class="sub">MRBL · emitido em ' + dmy(HOJE) + ' às ' + agora().slice(11, 16) + ' por ' + esc(S.user) + (dreAte ? ' · Fluxo de Caixa lançado até ' + dm(dreAte) : '') + '<br>' + (ant ? 'Comparado com o último PDF baixado, em ' + esc(antQuando) + '.' : 'Primeiro PDF: os próximos vão marcar o que mudou a partir deste.') + '</p>';
     const cards = [
       '<div class="d"><span>Total do período</span><b>' + mi(tT) + '</b><small>' + (ant ? (tT - tAnt >= 0 ? '+' : '−') + mi(Math.abs(tT - tAnt)) + ' desde o último PDF' : 'pago + a pagar + previsão') + '</small></div>',
       '<div><span>Pago</span><b>' + mi(tP) + '</b><small>' + (tT ? Math.round(tP / tT * 100) : 0) + '% do período</small></div>',
@@ -2103,7 +2103,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       // todas as mudanças numa lista só, por tipo (começa na mesma página do resumo e continua nas seguintes)
       const L = [], grp = (tit, qtd, tot) => L.push('<tr class="wk"><td colspan="5">' + tit + ' · ' + qtd + '</td><td class="r">' + tot + '</td></tr>');
       const linha = (d, desc, antes, agora, ef) => L.push('<tr><td>' + d + '</td><td>' + desc + '</td><td class="r mut">' + antes + '</td><td class="r">' + agora + '</td><td></td><td class="r">' + ef + '</td></tr>');
-      const fz = (x) => esc(String(x.c.forn || '').replace(/ · direto na DRE$/, ''));
+      const fz = (x) => esc(String(x.c.forn || '').replace(/ · direto no Fluxo de Caixa$/, ''));
       if (cont.novo.length) { grp('Contas novas', cont.novo.length, sg(sv(cont.novo.filter((x) => x.st !== 'O'), (x) => x.v))); cont.novo.sort((a, b) => a.d.localeCompare(b.d)).forEach((x) => linha(dm(x.d), fz(x) + (x.st === 'O' ? ' <em>oficina não recebida · não soma</em>' : x.st === 'P' ? ' <em class="tg ok">pago</em>' : ''), '—', n(x.v), x.st === 'O' ? '–' : sg(x.v))); }
       if (cont.valor.length) { grp('Mudaram de valor', cont.valor.length, sg(sv(cont.valor.filter((y) => y.x.st !== 'O'), (y) => y.x.v - y.a[1]))); cont.valor.sort((a, b) => a.x.d.localeCompare(b.x.d)).forEach((y) => linha(dm(y.x.d), fz(y.x), n(y.a[1]), n(y.x.v), y.x.st === 'O' ? '–' : sg(y.x.v - y.a[1]))); }
       if (cont.saiu.length) { grp('Saíram do período (excluídas ou mudaram de mês)', cont.saiu.length, sg(-sv(cont.saiu.filter((x) => x.a[2] !== 'O'), (x) => x.a[1]))); cont.saiu.sort((a, b) => a.a[0].localeCompare(b.a[0])).forEach((x) => linha(dm(fotoData(x.a[0])), esc(x.a[3] || x.k) + (x.a[2] === 'O' ? ' <em>oficina não recebida</em>' : ''), n(x.a[1]), esc(x.onde), x.a[2] === 'O' ? '–' : sg(-x.a[1]))); }
@@ -2121,7 +2121,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const byKey = {};
     sel.filter((m) => m >= CUR).forEach((m) => prevsOf(m).forEach((p) => { const k = pKey(p); const r = byKey[k] = byKey[k] || { nome: p.nome, cat: p.cat, m: {} }; const l = sum(lancPrev(m).filter((c) => matchPrev(p, c))); r.m[m] = { v: p.valor, l, s: Math.max(0, p.valor - l) }; }));
     const pm = sel.filter((m) => m >= CUR);
-    let p2 = '<h1 class="h1s">Previsões e semanas</h1><p class="sub">Para custos que ainda não têm conta lançada usamos uma estimativa por mês (média dos últimos ' + hm + ' meses fechados na DRE, ajustável em Configurações › Previsões). Cada estimativa desconta o que já foi lançado no mês — contas a pagar, pagas e lançamentos feitos direto na DRE — pela subcategoria ou pela previsão escolhida na conta. Oficina ainda não recebida não soma: fica dentro da média.</p>';
+    let p2 = '<h1 class="h1s">Previsões e semanas</h1><p class="sub">Para custos que ainda não têm conta lançada usamos uma estimativa por mês (média dos últimos ' + hm + ' meses fechados no Fluxo de Caixa, ajustável em Configurações › Previsões). Cada estimativa desconta o que já foi lançado no mês — contas a pagar, pagas e lançamentos feitos direto no Fluxo de Caixa — pela subcategoria ou pela previsão escolhida na conta. Oficina ainda não recebida não soma: fica dentro da média.</p>';
     if (pm.length && Object.keys(byKey).length) {
       const ks = Object.keys(byKey).sort((a, b) => Object.values(byKey[b].m).reduce((x, y) => x + y.v, 0) - Object.values(byKey[a].m).reduce((x, y) => x + y.v, 0));
       p2 += '<h2>Previsões (R$) · previsto, com já lançado / falta lançar embaixo</h2><table><thead><tr><th>Previsão</th><th>Categoria</th>' + pm.map((m) => '<th class="r">' + ms(m) + '</th>').join('') + '<th class="r">Falta lançar</th></tr></thead><tbody>' +
@@ -2162,12 +2162,12 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
         if (l.prev) { rows.push('<tr><td class="ck">☐</td><td><b>Previsão · ' + esc(l.nm) + '</b> <span class="mut">estimativa ' + n(l.o.v) + ' − já lançado ' + n(l.o.l) + '</span></td><td class="mut">estimativa</td><td class="r">' + (ant ? (l.cmp || '<span class="mut">igual</span>') : '') + '</td><td class="r">' + n(l.o.s) + '</td></tr>'); return; }
         const x = l.x, c = x.c;
         let tg = '';
-        if (x.st === 'P') tg += tag('ok', x.av ? 'pago · direto na DRE' : c.dreId ? 'pago · na DRE' : 'pago');
+        if (x.st === 'P') tg += tag('ok', x.av ? 'pago · direto no Fluxo de Caixa' : c.dreId ? 'pago · no Fluxo de Caixa' : 'pago');
         if (isPror(c)) tg += tag('pr', 'prorrog. de ' + dm(origOf(c)));
         else if (isLate(c)) tg += tag('lt', 'vencida');
         if (c.parcId) tg += tag('pa', 'parcela');
         const cc = ant ? (chg[x.k] ? chg[x.k].map((t) => '<em class="tg ' + t.c + '">' + esc(t.s) + '</em>').join(' ') : '<span class="mut">igual</span>') : '';
-        rows.push('<tr><td class="ck">' + (x.st === 'P' ? '✔' : '☐') + '</td><td>' + esc(String(c.forn).replace(/ · direto na DRE$/, '')) + tg + '</td><td><span class="sb">' + esc(cap(String(c.sub || '').toLowerCase())) + '</span><span class="cs">' + esc(cap(String(c.cat || '').toLowerCase())) + '</span></td><td class="r">' + cc + '</td><td class="r">' + n(x.v) + '</td></tr>');
+        rows.push('<tr><td class="ck">' + (x.st === 'P' ? '✔' : '☐') + '</td><td>' + esc(String(c.forn).replace(/ · direto no Fluxo de Caixa$/, '')) + tg + '</td><td><span class="sb">' + esc(cap(String(c.sub || '').toLowerCase())) + '</span><span class="cs">' + esc(cap(String(c.cat || '').toLowerCase())) + '</span></td><td class="r">' + cc + '</td><td class="r">' + n(x.v) + '</td></tr>');
       });
       const tot = lines.reduce((a, z) => a + vOf(z), 0), tp = sumOk.filter((x) => x.st === 'P').reduce((a, x) => a + x.v, 0);
       rows.push('<tr class="mt"><td colspan="4">Total de ' + ml(m).toLowerCase() + ' · pago ' + n(tp) + ' + a pagar ' + n(sumOk.filter((x) => x.st === 'A').reduce((a, x) => a + x.v, 0)) + ' + previsão ' + n(tot - sumOk.reduce((a, x) => a + x.v, 0)) + '</td><td class="r">' + n(tot) + '</td></tr>');
@@ -2222,13 +2222,13 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       const ent = S.entradas.slice().sort((a,b) => a.data.localeCompare(b.data));
       sheet('Despesas', [['Data', 12], ['Mês', 10], ['Categoria', 34], ['Subcategoria', 36], ['Empresa', 10], ['Valor', 15], ['Fornecedor / descrição', 40], ['Responsável', 14], ['Observação', 44], ['Ligada a Contas a pagar', 12]],
         sai.map((x) => [dt(x.data), x.data.slice(0,7), x.cat || '', x.sub || '', x.emp || '', Math.round(x.valor * 100) / 100, x.forn || '', x.resp || '', x.obs || '', x.contaId ? 'Sim' : '']), 'FFB42318', 6);
-      sheet('Entradas', [['Data', 12], ['Mês', 10], ['Categoria', 28], ['Cliente', 34], ['NF', 22], ['Valor', 15], ['Responsável', 14], ['Observação', 44], ['Entra na DRE', 12]],
+      sheet('Entradas', [['Data', 12], ['Mês', 10], ['Categoria', 28], ['Cliente', 34], ['NF', 22], ['Valor', 15], ['Responsável', 14], ['Observação', 44], ['Entra no Fluxo de Caixa', 12]],
         ent.map((x) => [dt(x.data), x.data.slice(0,7), x.cat || '', x.cli || '', x.nf || '', Math.round(x.valor * 100) / 100, x.resp || '', x.obs || '', EXCL_ENT.includes(x.cat) ? 'Não' : 'Sim']), 'FF17784A', 6);
       const buf = await wb.xlsx.writeBuffer();
-      const r = await baixar('MRBL_DRE_lancamentos_' + HOJE + '.xlsx', new Blob([buf]));
+      const r = await baixar('MRBL_Lancamentos_de_Caixa_' + HOJE + '.xlsx', new Blob([buf]));
       if (r === 'declined') { toast('Download cancelado.', false); return; }
       if (r === 'busy') { toast('Já tem um download esperando confirmação.', false); return; }
-      logar('Exportou os lançamentos da DRE em Excel (' + sai.length + ' despesas, ' + ent.length + ' entradas)', 'drel');
+      logar('Exportou os Lançamentos de Caixa em Excel (' + sai.length + ' despesas, ' + ent.length + ' entradas)', 'drel');
       toast('Excel com ' + sai.length + ' despesas e ' + ent.length + ' entradas pronto.', false);
     } catch (err) { console.error(err); toast('Não consegui gerar o Excel. Confira a conexão e tente de novo.', false); }
     finally { btn.disabled = false; btn.innerHTML = lbl; }
@@ -2243,14 +2243,14 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       const meses = DRE_MESES.map((k) => cap(MESES[parseInt(k.slice(5),10)-1].slice(0,3)) + '/' + k.slice(2,4));
       const wb = new ExcelJS.Workbook(); wb.creator = S.user || 'MRBL'; wb.created = new Date();
       const NAVY = 'FF102574', GOLD = 'FFD3A512', FMT = '#,##0.00;[Red]-#,##0.00;"–"';
-      const ws = wb.addWorksheet('DRE 2026', { views: [{ state: 'frozen', xSplit: 1, ySplit: 4 }], properties: { outlineLevelRow: 2 } });
+      const ws = wb.addWorksheet('Fluxo de Caixa 2026', { views: [{ state: 'frozen', xSplit: 1, ySplit: 4 }], properties: { outlineLevelRow: 2 } });
       ws.properties.outlineProperties = { summaryBelow: false };
       ws.getColumn(1).width = 46; for (let c = 2; c <= 14; c++) ws.getColumn(c).width = c === 14 ? 17 : 14;
-      ws.mergeCells(1, 1, 1, 14); ws.getCell(1,1).value = 'DRE gerencial 2026 · MRBL · regime de caixa';
+      ws.mergeCells(1, 1, 1, 14); ws.getCell(1,1).value = 'Fluxo de Caixa 2026 · MRBL · regime de caixa';
       ws.getCell(1,1).font = { bold: true, size: 14, color: { argb: NAVY } };
-      ws.mergeCells(2, 1, 2, 14); ws.getCell(2,1).value = 'Exportado em ' + dmy(HOJE) + ' por ' + (S.user || '—') + '. Jan–jun: aba DRE 2026 (consolidado); jul em diante: DRE lançamentos. Recebimento MRBL e STOFFA ficam de fora.';
+      ws.mergeCells(2, 1, 2, 14); ws.getCell(2,1).value = 'Exportado em ' + dmy(HOJE) + ' por ' + (S.user || '—') + '. Jan–jun: aba DRE 2026 (consolidado); jul em diante: Lançamentos de Caixa. Recebimento MRBL e STOFFA ficam de fora.';
       ws.getCell(2,1).font = { size: 9, color: { argb: 'FF666666' } };
-      const head = ws.getRow(4); head.values = ['DRE gerencial'].concat(meses, ['Acumulado 2026']);
+      const head = ws.getRow(4); head.values = ['Fluxo de Caixa'].concat(meses, ['Acumulado 2026']);
       head.eachCell((c) => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } }; c.alignment = { horizontal: 'center' }; });
       head.getCell(1).alignment = { horizontal: 'left' };
       const add = (label, arr, o) => {
@@ -2292,11 +2292,11 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       wf.addRow([]); wf.addRow(['* mês em andamento, ainda parcial']).font = { size: 9, color: { argb: 'FF666666' } };
       const buf = await wb.xlsx.writeBuffer();
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const r = await baixar('MRBL_DRE_2026_' + HOJE + '.xlsx', blob);
+      const r = await baixar('MRBL_Fluxo_de_Caixa_2026_' + HOJE + '.xlsx', blob);
       if (r === 'declined') { toast('Download cancelado.', false); return; }
       if (r === 'busy') { toast('Já tem um download esperando confirmação.', false); return; }
-      logar('Exportou a DRE 2026 em Excel', 'dre');
-      toast('Excel da DRE 2026 pronto.', false);
+      logar('Exportou o Fluxo de Caixa 2026 em Excel', 'dre');
+      toast('Excel do Fluxo de Caixa 2026 pronto.', false);
     } catch (err) { console.error(err); toast('Não consegui gerar o Excel. Confira a conexão e tente de novo.'); }
     finally { btn.disabled = false; btn.innerHTML = lbl; }
   }

@@ -10,7 +10,7 @@ export function montarLogin(raiz, { api, logo, aoEntrar }) {
     const u = usuarios.find((x) => x.nome === atual) || usuarios[0];
     const primeiro = u && !u.temSenha;
     return '<div class="login" id="loginBox"><form id="loginForm" novalidate><div class="lg-brand">' +
-      (logo ? '<img src="' + logo + '" alt="MRBL">' : '<b>MRBL</b>') + '<small>Financeiro · contas a pagar e DRE</small></div>' +
+      (logo ? '<img src="' + logo + '" alt="MRBL">' : '<b>MRBL</b>') + '<small>Financeiro · contas a pagar e fluxo de caixa</small></div>' +
       '<label>Usuário<select id="lgUser" autocomplete="username">' + usuarios.map((x) => '<option' + (u && x.nome === u.nome ? ' selected' : '') + '>' + esc(x.nome) + '</option>').join('') + '</select></label>' +
       (primeiro ? '<p class="lg-first">Primeiro acesso de <b>' + esc(u.nome) + '</b>: use o código de convite que você recebeu e crie sua senha (mínimo 6 caracteres).</p>' +
         '<label>Código de convite<input id="lgConvite" autocomplete="one-time-code" required></label>' : '') +
