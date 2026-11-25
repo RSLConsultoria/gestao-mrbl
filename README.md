@@ -1,4 +1,4 @@
-# MRBL Financeiro
+# Gestão MRBL
 
 Contas a pagar, oficinas, previsões e DRE da MRBL. Dados no Google Sheets "Financeiro MRBL", servidor em Google Apps Script, telas estáticas publicadas pelo GitHub.
 
