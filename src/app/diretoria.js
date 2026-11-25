@@ -29,23 +29,34 @@ function dataBR(v){
 }
 const numPlan = (v) => { if (v == null || v === '') return null; if (typeof v === 'number') return v; const t = String(v).replace(/R\$|\s|\u00a0/g, ''); if (!t) return null; const x = parseFloat(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); return isFinite(x) ? x : null; };
 // Uma aba SEMANAL (linhas já como listas de valores, coluna A = índice 0), com as regras de limpeza do Power BI:
-// pula cabeçalho, linhas de previsão e de totais (mês, Bragança, São Paulo, Externo, Seda, Realizado); sem data de faturamento fica de fora.
-export function lerSemanal(linhas){
-  const rows = []; let semData = 0, ign = 0;
+// pula cabeçalho, linhas de previsão e de totais (Bragança, São Paulo, Externo, Seda, Realizado e subtotais da semana).
+// O MÊS de cada linha é o bloco da planilha: as linhas ficam acima da linha com o nome do mês na coluna I (FEVEREIRO,
+// MARÇO...), que traz o total do mês. Assim o mês bate com o total que a planilha mostra, mesmo quando a "Data Fat."
+// está vazia, em texto ("04 e 05/02/2025") ou com o ano digitado errado. Sem o ano da aba (ou linhas depois do
+// último bloco), vale o mês da Data Fat.
+const MESES_N = ['JANEIRO', 'FEVEREIRO', 'MARCO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+export function lerSemanal(linhas, anoAba){
+  const rows = []; let semData = 0, ign = 0, noBloco = 0, pend = [];
   linhas.forEach((r) => {
     if (!r) return;
     const c = (i) => r[i - 1], tx = (i) => { const v = c(i); return v == null || v instanceof Date ? '' : String(v).trim(); };
-    const os = tx(3), cli = tx(4), prod = tx(6);
-    if (!os && !cli) return;
+    const os = tx(3), cli = tx(4), prod = tx(6), col9 = semAcento(tx(9)), mi = MESES_N.indexOf(col9);
+    if (mi >= 0 && anoAba) {
+      const mk = anoAba + '-' + pad2(mi + 1);
+      pend.forEach((x) => { if (!x.data || x.data.slice(0, 7) !== mk) { noBloco++; x.data = mk + '-01'; } rows.push(x); });
+      pend = []; return;
+    }
+    // subtotais da semana: sem OS, sem cliente e sem NF (às vezes com um "L" na coluna do produto)
+    if ((!os && !prod) || (!os && !cli && !tx(13))) return;
     if (semAcento(os) === 'OS') return;
     if (/PREVIS/.test(semAcento(os))) { ign++; return; }
-    if (CONS.some((x) => semAcento(tx(9)).includes(x))) { ign++; return; }
-    if (!os && !prod) return;
-    const data = dataBR(c(12)), qtd = numPlan(c(10)) || 0, valor = numPlan(c(11)) || 0;
-    if (!data) { if (qtd || valor) semData++; return; }
-    rows.push({ data, os, cli, canal: tx(5), prod, corte: numPlan(c(7)), vUnit: numPlan(c(8)), qtd, valor, nf: tx(13) });
+    if (CONS.some((x) => col9.includes(x))) { ign++; return; }
+    const qtd = numPlan(c(10)) || 0, valor = numPlan(c(11)) || 0;
+    if (!qtd && !valor) return;
+    pend.push({ data: dataBR(c(12)), os, cli, canal: tx(5), prod, corte: numPlan(c(7)), vUnit: numPlan(c(8)), qtd, valor, nf: tx(13) });
   });
-  return { rows, semData, ign };
+  pend.forEach((x) => { if (x.data) rows.push(x); else semData++; });
+  return { rows, semData, ign, noBloco };
 }
 
 export function criarDiretoria(ctx){
@@ -507,10 +518,10 @@ export function criarDiretoria(ctx){
     const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
     const abas = wb.worksheets.filter((w) => /SEMANAL/i.test(w.name));
     if (!abas.length) throw new Error('Não achei nenhuma aba SEMANAL no arquivo.');
-    const r = { rows: [], semData: 0, ign: 0, abas: abas.map((w) => w.name) };
+    const r = { rows: [], semData: 0, ign: 0, noBloco: 0, abas: abas.map((w) => w.name) };
     abas.forEach((ws) => {
       const linhas = []; ws.eachRow((row, n) => { linhas[n - 1] = (row.values || []).slice(1).map(cellVal); });
-      const x = lerSemanal(linhas); r.rows.push(...x.rows); r.semData += x.semData; r.ign += x.ign;
+      const ano = (ws.name.match(/(20\d\d)/) || [])[1]; const x = lerSemanal(linhas, ano); r.rows.push(...x.rows); r.semData += x.semData; r.ign += x.ign; r.noBloco += x.noBloco;
     });
     // data de faturamento fora do ano anterior e do atual é erro de digitação na planilha (ex.: 1934, 2023): fica de fora
     const ok = (d) => { const a = +d.slice(0, 4); return a >= ANO - 1 && a <= ANO + 1; };
@@ -522,7 +533,7 @@ export function criarDiretoria(ctx){
     const M = {}; I.rows.forEach((r) => { const m = M[r.data.slice(0, 7)] = M[r.data.slice(0, 7)] || { n: 0, qtd: 0, valor: 0 }; m.n++; m.qtd += r.qtd; m.valor += r.valor; });
     const antes = {}; FAT.forEach((r) => { const mk = String(r.data).slice(0, 7); antes[mk] = (antes[mk] || 0) + (+r.valor || 0); });
     return '<div class="modal-bg" data-modal-bg><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt" style="width:min(720px,96vw)"><div class="mh"><h2 id="mt">Importar faturamento · ' + esc(I.arquivo) + '</h2><button type="button" class="mx" data-modal-close aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="fbody">' +
-      '<p style="margin:0 0 10px;color:var(--muted)">Abas lidas: ' + esc(I.abas.join(', ')) + '. ' + I.rows.length + ' linhas faturadas' + (I.semData ? ', ' + I.semData + ' sem data de faturamento (ficam de fora)' : '') + (I.ign ? ', ' + I.ign + ' de previsão ou total ignoradas' : '') + (I.foraAno && I.foraAno.length ? ', ' + I.foraAno.length + ' com data fora de ' + (ANO - 1) + '–' + (ANO + 1) + ' (ficam de fora; confira na planilha: ' + esc([...new Set(I.foraAno)].sort().slice(0, 6).map((d) => d.split('-').reverse().join('/')).join(', ')) + ')' : '') + '.</p>' +
+      '<p style="margin:0 0 10px;color:var(--muted)">Abas lidas: ' + esc(I.abas.join(', ')) + '. ' + I.rows.length + ' linhas faturadas' + (I.noBloco ? ', ' + I.noBloco + ' entram no mês do bloco da planilha (data de faturamento vazia, em texto ou de outro mês)' : '') + (I.semData ? ', ' + I.semData + ' sem data e fora de bloco (ficam de fora)' : '') + (I.ign ? ', ' + I.ign + ' de previsão ou total ignoradas' : '') + (I.foraAno && I.foraAno.length ? ', ' + I.foraAno.length + ' com data fora de ' + (ANO - 1) + '–' + (ANO + 1) + ' (ficam de fora; confira na planilha: ' + esc([...new Set(I.foraAno)].sort().slice(0, 6).map((d) => d.split('-').reverse().join('/')).join(', ')) + ')' : '') + '.</p>' +
       '<div class="imp-tab"><table><thead><tr><th>Mês</th><th class="r">Linhas</th><th class="r">Peças</th><th class="r">Faturado no arquivo</th><th class="r">Importado antes</th></tr></thead><tbody>' +
       Object.keys(M).sort().map((mk) => '<tr><td>' + dirMk(mk) + '</td><td class="r num">' + M[mk].n + '</td><td class="r num">' + dirN(M[mk].qtd) + '</td><td class="r num">' + money(M[mk].valor) + '</td><td class="r num">' + (antes[mk] ? money(antes[mk]) : '—') + '</td></tr>').join('') +
       '</tbody></table></div>' +

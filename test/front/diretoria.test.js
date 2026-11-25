@@ -30,6 +30,19 @@ describe('Diretoria: leitura da aba SEMANAL', () => {
     expect(r.rows.map((x) => [x.data, x.os, x.cli, x.qtd, x.valor])).toEqual([['2026-10-05', '101', 'ANIMALE', 10, 1234.5], ['2026-10-07', '102', 'MIXED', 5, 100]]);
     expect([r.ign, r.semData]).toEqual([2, 1]);
   });
+  it('o mês é o bloco da planilha (linha com o nome do mês), mesmo com Data Fat. vazia, em texto ou de outro ano', () => {
+    const r = lerSemanal([
+      L('201', 'ANIMALE', '', 10, 100, '05/02/2025'),
+      L('202', 'ANIMALE', '', 5, 50, '05/02/2024'),
+      L('203', 'MIXED', '', 2, 20, '04 e 05/02/2025'),
+      L('204', 'MIXED', '', 1, 10, ''),
+      ['', '', '', '', '', 'L', 18, '', 0, 18, 180, '', ''],
+      ['', '', '', '', '', '', '', '', 'FEVEREIRO', 18, 180, '', ''],
+      ['', '', '', '', '', '', '', '', 'BRAG. PTA', 18, 180, '', ''],
+    ], '2025');
+    expect(r.rows.map((x) => [x.os, x.data, x.valor])).toEqual([['201', '2025-02-05', 100], ['202', '2025-02-01', 50], ['203', '2025-02-01', 20], ['204', '2025-02-01', 10]]);
+    expect(r.noBloco).toBe(3);
+  });
 });
 
 describe('Diretoria: metas vão para a Config', () => {
