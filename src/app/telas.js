@@ -1428,7 +1428,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const app = document.getElementById('app');
     if (!view.repWin) view.repWin = mAdd(CUR, -1);
     const months = repMonths();
-    if (!view.repSel || !view.repSel.length || !view.repSel.every((m) => months.includes(m))) view.repSel = months.slice();
+    if (!view.repSel || !view.repSel.length || !view.repSel.every((m) => months.includes(m))) { const ate = CUR.slice(0,4) + '-12'; view.repSel = months.filter((m, i) => m <= ate || i < 2); }
     const sel = months.filter((m) => view.repSel.includes(m));
     const D = months.map(repMonth), DS = D.filter((o) => sel.includes(o.m));
     const ml = (m) => cap(mesNome(m)).slice(0,3) + (m.slice(0,4) !== CUR.slice(0,4) ? '/' + m.slice(2,4) : '');
@@ -1465,7 +1465,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     h += '<section class="panel"><div class="ph"><div class="mnav"><h2>' + cap(mesNome(months[0])) + ' de ' + months[0].slice(0,4) + ' a ' + mesNome(months[months.length-1]) + ' de ' + months[months.length-1].slice(0,4) + '</h2>' + '</div>' +
       '<div class="rsel"><div class="seg sm" role="tablist" aria-label="Ver por">' + [['mes','Mês'],['sem','Semana']].map(([k, t]) => '<button type="button" role="tab" data-rgran="' + k + '" aria-selected="' + (gran === k) + '">' + t + '</button>').join('') + '</div><span class="lbl">Meses no recorte</span><div class="mtog" role="group" aria-label="Meses no recorte">' + months.map((m) => '<button type="button" data-rsel="' + m + '" aria-pressed="' + sel.includes(m) + '"><i aria-hidden="true"></i>' + ml(m) + '</button>').join('') + '</div><button type="button" class="mall" data-rsel="all"' + (sel.length === months.length ? ' disabled' : '') + '>Todos</button></div></div>';
     const hp = (v) => v > 0 ? Math.max(3, v / max * H) : 0;
-    h += '<div class="rchart' + (gran === 'sem' ? ' wk' : '') + '"' + (gran === 'mes' && months.length <= 3 ? ' style="justify-content:center;gap:160px"' : '') + '>' + CH.map((o) => { const a = hp(o.pago), b = hp(o.aberto), c = hp(o.prev);
+    h += '<div class="rchart' + (gran === 'sem' ? ' wk' : months.length > 6 ? ' muitos' : '') + '"' + (gran === 'mes' && months.length <= 3 ? ' style="justify-content:center;gap:160px"' : '') + '>' + CH.map((o) => { const a = hp(o.pago), b = hp(o.aberto), c = hp(o.prev);
       const lp = a / 2 - 9, la = Math.max(a ? lp + 19 : 0, a + b / 2 - 9), lv = Math.max(b ? la + 19 : (a ? lp + 19 : 0), a + b + c / 2 - 9);
       return '<button type="button" class="rcol' + (gran === 'sem' ? ' on' + (o.cur ? ' cur' : '') + '" tabindex="-1" title="Semana ' + o.label : (sel.includes(o.m) ? ' on' : '') + (o.m === CUR ? ' cur' : '') + '" data-rsel="' + o.m + '" title="' + cap(mesNome(o.m))) + ': pago ' + money(o.pago) + ' · a pagar lançado ' + money(o.aberto) + ' · previsão ' + money(o.prev) + '">' +
       '<span class="rtot num">' + (o.tot ? short(o.tot) : '—') + '</span><span class="rplot" style="height:' + H + 'px"><span class="rbar"><i class="rpv" style="height:' + c.toFixed(1) + 'px"></i><i class="ra" style="height:' + b.toFixed(1) + 'px"></i><i class="rp" style="height:' + a.toFixed(1) + 'px"></i></span>' +
@@ -1481,7 +1481,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const maxCell = Math.max(1, ...keys.flatMap((k) => cats[k].v)), maxRow = Math.max(1, ...keys.map((k) => tot(cats[k].v)));
     const heat = (v) => { if (!v) return ''; const t = Math.pow(v / maxCell, 0.6); return 'background:rgba(211,165,18,' + (0.06 + 0.5 * t).toFixed(3) + ')' + (t > 0.7 ? ';font-weight:700' : ''); };
     h += '<section class="panel"><div class="ph"><h2>Por categoria</h2><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="seg sm" role="tablist">' + [['all','Pago + previsto'],['pago','Só pago'],['prev','Só previsto']].map(([k, t]) => '<button type="button" role="tab" data-rval="' + k + '" aria-selected="' + (val === k) + '">' + t + '</button>').join('') + '</div><button type="button" class="btn sm" data-rel="open:all">Abrir todas</button><button type="button" class="btn sm" data-rel="open:none">Fechar todas</button></div></div>';
-    h += '<div class="scroll"><table class="rel rep"><thead><tr><th style="min-width:280px">Categoria</th>' + COLS.map((o) => '<th class="r' + (o.cur ? ' cur' : '') + '">' + o.label + '</th>').join('') + '<th class="r">Total</th><th style="width:150px">Peso no recorte</th></tr></thead><tbody>';
+    h += '<div class="scroll repw"><table class="rel rep' + (COLS.length > 6 ? ' muitas' : '') + '"><thead><tr><th style="min-width:280px">Categoria</th>' + COLS.map((o) => '<th class="r' + (o.cur ? ' cur' : '') + '">' + o.label + '</th>').join('') + '<th class="r">Total</th><th style="width:150px">Peso no recorte</th></tr></thead><tbody>';
     if (!keys.length) h += '<tr><td colspan="' + (COLS.length + 3) + '" class="empty">Nada neste recorte.</td></tr>';
     keys.forEach((k) => { const r = cats[k], t = tot(r.v), open = view.relOpen[k];
       const catAtr = Object.values(r.itens || {}).flat().filter((it) => it.k === 'aberto' && it.c.data < HOJE);
@@ -2078,7 +2078,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (e.target.id === 'btnRegD') { regDespesa(); return; }
     if (e.target.id === 'btnRegE') { regEntrada(); return; }
     const rw = e.target.closest('[data-rwin]'); if (rw) { const n = +rw.dataset.rwin; view.repWin = n === 0 ? mAdd(CUR, -1) : mAdd(view.repWin || mAdd(CUR, -1), n); view.repSel = null; render(); return; }
-    const rs = e.target.closest('[data-rsel]'); if (rs) { const m = rs.dataset.rsel; if (m === 'all') view.repSel = null; else { const cur = view.repSel || []; const allOn = cur.length === repMonths().length; view.repSel = allOn ? [m] : cur.includes(m) ? cur.filter((x) => x !== m) : cur.concat(m); if (!view.repSel.length) view.repSel = null; } render(); return; }
+    const rs = e.target.closest('[data-rsel]'); if (rs) { const m = rs.dataset.rsel; if (m === 'all') view.repSel = repMonths(); else { const cur = view.repSel || []; const allOn = cur.length === repMonths().length; view.repSel = allOn ? [m] : cur.includes(m) ? cur.filter((x) => x !== m) : cur.concat(m); if (!view.repSel.length) view.repSel = null; } render(); return; }
     const rv = e.target.closest('[data-rval]'); if (rv) { view.relVal = rv.dataset.rval; render(); return; }
     const rg = e.target.closest('[data-rgran]'); if (rg) { view.relGran = rg.dataset.rgran; render(); return; }
     const rb = e.target.closest('[data-rel]');

@@ -83,3 +83,13 @@ table.cmpt th:not(:first-child),table.cmpt td:not(:first-child){min-width:120px}
 .cmpleg .c26,.cmpstk .c26{background:var(--navy)}.cmpleg .c25,.cmpstk .c25{background:#B8C0D3}
 .cmpchart .cmpstk{display:flex;align-items:flex-end;justify-content:center;gap:3px}
 .cmpchart .cmpstk>span{display:block;width:42%;border-radius:3px 3px 0 0}
+/* Relatório de despesas com 12 meses: colunas do gráfico mais estreitas (só o total em cima) e a tabela rola dentro do painel */
+.rchart.muitos{gap:6px;padding:14px 12px 6px;justify-content:space-between}
+.rchart.muitos .rcol{flex:1 1 0;min-width:0;padding:8px 0}
+.rchart.muitos .rlab{font-size:12.5px;white-space:nowrap}.rchart.muitos .rtot{font-size:12.5px;white-space:nowrap}
+.rchart.muitos .rlabs{display:none}.rchart.muitos .rbar{width:min(52px,70%)}
+.scroll.repw{overflow-x:auto!important;max-width:100%}
+/* muitos meses na tabela: tudo mais compacto para caber sem rolar */
+table.rel.rep.muitas td,table.rel.rep.muitas th{padding-left:6px;padding-right:6px;font-size:13px}
+table.rel.rep.muitas th:first-child{min-width:220px!important}
+table.rel.rep.muitas th:last-child{width:120px!important}
