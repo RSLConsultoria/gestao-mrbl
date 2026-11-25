@@ -489,3 +489,7 @@ tr.ritrow.rpg td{color:var(--muted)}
 @media (max-width:1640px){.sdrow{grid-template-columns:minmax(0,1fr) 140px auto;padding:8px 16px}.sdrow .acts{grid-column:auto;justify-content:flex-end}.sdp .ph,.sdnote,.sdfoot{padding-left:16px;padding-right:16px}}
 .sddist{margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--blue-soft)}.sddist b{display:block;color:var(--navy)}.sddist p{margin:2px 0 8px;font-size:13px;color:var(--muted)}
 .sdgrid{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-top:6px}.sdgrid .ff{display:flex;flex-direction:column;gap:3px;align-items:stretch}.sdgrid .ff input{width:170px}
+
+/* edição da conta: opção Sem data definida ao lado da data */
+.kdw{display:flex;gap:14px;align-items:center;min-width:0}.kdw input[type=date]{flex:1;min-width:0}
+.ksd{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer}.ksd input{width:16px;height:16px;margin:0;accent-color:var(--navy)}

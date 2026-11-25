@@ -326,7 +326,8 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       ev.forEach((x) => { if (x.k === 'g' && /antecipada/.test(x.t)) x.k = 'a'; });
       const tl = '<ol class="tl">' + ev.map((x, i) => '<li class="' + (/^Obs: /.test(x.t) ? 'n' : x.k) + (i === ev.length - 1 ? ' last' : '') + '">' + (/^Obs: /.test(x.t) ? '<span class="tln">' + esc(x.t.slice(5)) + '</span>' : '<b>' + esc(x.t) + '</b>') + (x.sub ? '<small>criada em ' + quando(x.sub.em) + (x.sub.por ? ' por <span class="who">' + esc(x.sub.por) + '</span>' : '') + '</small>' : '') + (x.em ? '<small>' + quando(x.em) + (x.por ? ' por <span class="who">' + esc(x.por) + '</span>' : '') + '</small>' : '') + '</li>').join('') + '</ol>';
       return '<div class="modal-bg" data-modal-bg><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="mt" id="editRow"><div class="mh"><h2 id="mt">' + esc(c.forn) + '</h2>' + st + '<button type="button" class="mx" data-modal-close aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="ebody"><div class="egrid"><div class="fbody">' +
-        fld('Data de pagamento', '<input type="date" id="kData" value="' + ed.data + '"' + (c.pago ? ' disabled' : '') + '>') +
+        fld('Data de pagamento', '<div class="kdw"><input type="date" id="kData" value="' + (ed.semData ? '' : ed.data) + '"' + (c.pago || ed.semData ? ' disabled' : '') + '>' + (c.pago ? '' : '<span class="ksd"><input type="checkbox" id="kSemData"' + (ed.semData ? ' checked' : '') + '> Sem data definida</span>') + '</div>') +
+        (ed.semData ? '<p class="enote">Ao salvar, a conta sai de Contas a pagar' + (c.parcId ? ' (e do parcelamento)' : '') + ' e vai para <b>Sem data definida</b>, abaixo das Vencidas. De lá você define a data ou parcela.</p>' : '') +
         fld('Categoria', '<select id="kCat">' + catOpts(ed.cat) + '</select>') +
         fld('Subcategoria', '<select id="kSub">' + subOpts(ed.cat, ed.sub) + '</select>') +
         fld('Fornecedor', '<input id="kForn" data-cbx="kFornList" data-novo="1" value="' + esc(ed.forn) + '" autocomplete="off"><datalist id="kFornList">' + fornOpts(ed.cat, ed.sub) + '</datalist>') +
@@ -335,7 +336,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
           return fld('Desconta da previsão', '<select id="kPrev" title="Por padrão desconta da previsão da mesma categoria e subcategoria. Escolha outra para descontar dela sem mudar a categoria."><option value="">Automático (pela categoria)</option>' + nomes.map((n) => '<option' + (n === ed.prev ? ' selected' : '') + '>' + esc(n) + '</option>').join('') + '</select>'); })() +
         (c.parcId && pById(c.parcId) ? '<p class="enote">Parcela ' + c.parcN + '/' + pById(c.parcId).qtd + ' do parcelamento <b>' + esc(pById(c.parcId).nome) + '</b>. <button type="button" class="lnk" data-goparc="' + c.parcId + '">Ver em Parcelamentos ›</button></p>' : '') +
         fld('Observação', '<textarea id="kObs" rows="3" placeholder="Escreva uma observação. Ao salvar, ela entra na linha do tempo com seu nome.">' + esc(ed.obs || '') + '</textarea>') +
-        (ed.data !== c.data && !c.pago ? '<p class="enote">A data muda de ' + dmy(c.data) + ' para ' + dmy(ed.data) + (ed.data > c.data ? ' e entra no histórico como prorrogação.' : '.') + '</p>' : '') +
+        (ed.data !== c.data && !c.pago && !ed.semData ? '<p class="enote">A data muda de ' + dmy(c.data) + ' para ' + dmy(ed.data) + (ed.data > c.data ? ' e entra no histórico como prorrogação.' : '.') + '</p>' : '') +
         '</div><div class="tlbox"><h3>Linha do tempo</h3><div class="tlscroll">' + tl + '</div>' +
         (c.pago ? '<button type="button" class="btn big" id="eUnpay">Desfazer pagamento</button>' : '<button type="button" class="btn pri big" id="ePay">Pagar</button>') +
         '</div></div></div>' +
@@ -2722,7 +2723,8 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     // enquanto o ano está sendo digitado (0002, 0020, 0202...) não grava nada
     if (t.type === 'date' && t.value && t.value.slice(0,4) < '2000') return;
     if (t.type === 'date' && t.matches(COMMIT_DATE) && !t._force) { pendDate(t); return; }
-    if (t.id === 'kData') { readEdit(); view.ed.data = t.value; render(); return; }
+    if (t.id === 'kData') { readEdit(); if (t.value) view.ed.data = t.value; else view.ed.semData = true; render(); return; }
+    if (t.id === 'kSemData') { readEdit(); view.ed.semData = t.checked; render(); return; }
     if (t.id === 'kCat') { readEdit(); view.ed.cat = t.value; view.ed.sub = (LISTAS[t.value] || [''])[0]; render(); return; }
     if (t.id === 'kSub') { readEdit(); view.ed.sub = t.value; render(); return; }
     if (t.id === 'kPrev') { readEdit(); view.ed.prev = t.value; return; }
@@ -2840,6 +2842,18 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (!ed.forn.trim()) { document.getElementById('modalErr').textContent = 'Preencha o fornecedor.'; return; }
     if (isNaN(parseVal(document.getElementById('kVal').value)) || ed.valor <= 0) { document.getElementById('modalErr').textContent = 'Valor inválido.'; return; }
     view.modal = null;
+    // data apagada ou "Sem data definida": a conta sai de Contas a pagar e vai para a tabela Sem data definida
+    if (ed.semData && !c.pago) {
+      const obsTxt = (ed.obs || '').trim(), p = c.parcId && pById(c.parcId);
+      act(ed.forn.trim() + ' foi para Sem data definida (vencia ' + dm(c.data) + ').', () => {
+        ensureForn(ed.forn, ed.cat, ed.sub);
+        const x = { id: novoId('sd'), forn: ed.forn.trim(), cat: ed.cat, sub: ed.sub, valor: ed.valor, obs: obsTxt, log: (c.log || []).slice() };
+        sdLog(x, 'Saiu de Contas a pagar (vencimento ' + dmy(c.data) + (p ? ', parcela ' + c.parcN + '/' + p.qtd + ' de ' + p.nome : '') + ') para Sem data definida');
+        if (obsTxt) sdLog(x, 'Obs: ' + obsTxt);
+        (S.semData = S.semData || []).push(x); S.contas = S.contas.filter((y) => y !== c);
+      });
+      return;
+    }
     const dsc = [];
     if (!c.pago && ed.data !== c.data) { const tp = tipoMud(c, ed.data); dsc.push(tp === 'Voltou ao vencimento original' ? 'voltou ao vencimento original ' + dm(ed.data) : tp.toLowerCase() + ' de ' + dm(c.data) + ' para ' + dm(ed.data)); }
     const obsTxt = (ed.obs || '').trim(); if (obsTxt) dsc.push('observação adicionada');
