@@ -1419,9 +1419,11 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (m >= CUR) prevsOf(m).forEach((p) => { const l = sum(LP.filter((c) => matchPrev(p, c))); add(p.cat, (p.subs.length === 1 ? p.subs[0] : p.nome) + ' · previsão', 'prev', Math.max(0, p.valor - l)); });
     o.tot = o.pago + o.aberto + o.prev; return o;
   }
-  // por enquanto o relatório trabalha só com novembro e dezembro; para voltar à janela de 6 meses, deixe REP_FIXO = null
-  const REP_FIXO = ['2026-11', '2026-12'];
-  const repMonths = () => REP_FIXO ? REP_FIXO.slice() : [0,1,2,3,4,5].map((k) => mAdd(view.repWin || mAdd(CUR, -1), k));
+  // o relatório mostra o mês atual e os 11 seguintes; "Meses no recorte" escolhe quais entram nos números e na tabela
+  const REP_N = 12;
+  const repMonths = () => Array.from({ length: REP_N }, (_, k) => mAdd(CUR, k));
+  // texto curto de uma lista de meses: "nov/26 a fev/27" quando seguidos, senão os nomes (ou "N meses")
+  const repLab = (ms) => { const l = (m) => cap(mesNome(m)).slice(0,3).toLowerCase() + '/' + m.slice(2,4); if (ms.length === 1) return 'em ' + mesNome(ms[0]); const seq = ms.every((m, i) => !i || mAdd(ms[i-1], 1) === m); return seq ? l(ms[0]) + ' a ' + l(ms[ms.length-1]) : ms.length <= 4 ? ms.map(l).join(', ') : ms.length + ' meses'; };
   function renderRel(){
     const app = document.getElementById('app');
     if (!view.repWin) view.repWin = mAdd(CUR, -1);
@@ -1453,14 +1455,14 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const falta = resto.reduce((a, o) => a + o.aberto + o.prev, 0);
     const pagoAno = S.contas.filter((c) => c.pago && (c.pagoEm || c.data).slice(0,4) === CUR.slice(0,4)).reduce((a, c) => a + c.valor, 0);
     const atrL = S.contas.filter((c) => naPagar(c) && !c.pago && c.data < HOJE), atrN = atrL.length, atrTot = atrL.reduce((t, c) => t + c.valor, 0);
-    h += '<div class="kpis"><div class="kpi"><span>Pago</span><b class="num">' + money(tP) + '</b><small>' + (sel.length === months.length ? (REP_FIXO ? 'em ' + months.map((m) => mesNome(m)).join(' e ') : 'nos 6 meses') : sel.map(ml).join(', ')) + '</small></div>' +
+    h += '<div class="kpis"><div class="kpi"><span>Pago</span><b class="num">' + money(tP) + '</b><small>' + repLab(sel) + '</small></div>' +
       '<div class="kpi g"><span>Previsto pagar</span><b class="num">' + money(tA + tV) + '</b><small>' + money(tA) + ' lançado · ' + money(tV) + ' de previsão a lançar</small>' + (atrTot ? '<em class="katr" title="Contas vencidas e ainda não pagas"><i aria-hidden="true"></i>' + atrN + (atrN === 1 ? ' atrasada' : ' atrasadas') + '<u class="num">' + money(atrTot) + '</u></em>' : '') + '</div>' +
       '<div class="kpi"><span>Total do recorte</span><b class="num">' + money(tP + tA + tV) + '</b><small>pago + previsto</small></div>' +
       '<div class="kpi d"><span>Falta pagar até dezembro</span><b class="num">' + money(falta) + '</b><small>' + cap(mesNome(CUR)) + ' a dezembro · ano todo ' + money(pagoAno + falta) + '</small></div></div>';
     // gráfico + recorte
     const max = Math.max(1, ...CH.map((o) => o.tot)), H = 190;
     const px = (v) => v > 0 ? Math.max(3, v / max * H).toFixed(1) + 'px' : '0';
-    h += '<section class="panel"><div class="ph"><div class="mnav">' + (REP_FIXO ? '<h2>' + cap(mesNome(months[0])) + ' e ' + mesNome(months[months.length-1]) + ' ' + months[0].slice(0,4) + '</h2>' : '<button type="button" class="nav" data-rwin="-1" aria-label="Mês anterior">‹</button><h2 style="min-width:240px;text-align:center">' + cap(mesNome(months[0])) + ' a ' + mesNome(months[5]) + ' ' + months[5].slice(0,4) + '</h2><button type="button" class="nav" data-rwin="1" aria-label="Próximo mês">›</button>' + (view.repWin !== mAdd(CUR, -1) ? '<button type="button" class="btn sm" data-rwin="0">Voltar para hoje</button>' : '')) + '</div>' +
+    h += '<section class="panel"><div class="ph"><div class="mnav"><h2>' + cap(mesNome(months[0])) + ' de ' + months[0].slice(0,4) + ' a ' + mesNome(months[months.length-1]) + ' de ' + months[months.length-1].slice(0,4) + '</h2>' + '</div>' +
       '<div class="rsel"><div class="seg sm" role="tablist" aria-label="Ver por">' + [['mes','Mês'],['sem','Semana']].map(([k, t]) => '<button type="button" role="tab" data-rgran="' + k + '" aria-selected="' + (gran === k) + '">' + t + '</button>').join('') + '</div><span class="lbl">Meses no recorte</span><div class="mtog" role="group" aria-label="Meses no recorte">' + months.map((m) => '<button type="button" data-rsel="' + m + '" aria-pressed="' + sel.includes(m) + '"><i aria-hidden="true"></i>' + ml(m) + '</button>').join('') + '</div><button type="button" class="mall" data-rsel="all"' + (sel.length === months.length ? ' disabled' : '') + '>Todos</button></div></div>';
     const hp = (v) => v > 0 ? Math.max(3, v / max * H) : 0;
     h += '<div class="rchart' + (gran === 'sem' ? ' wk' : '') + '"' + (gran === 'mes' && months.length <= 3 ? ' style="justify-content:center;gap:160px"' : '') + '>' + CH.map((o) => { const a = hp(o.pago), b = hp(o.aberto), c = hp(o.prev);
