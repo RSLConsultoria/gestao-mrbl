@@ -15,6 +15,8 @@ var SCHEMA = {
   SaldosBanco: ['id', 'data', 'banco', 'valor', 'em', 'por'],
   // contas a pagar ainda sem data: ficam fora de semanas, meses, Relatório e previsões até ganharem data ou virarem parcelamento
   ContasSemData: ['id', 'forn', 'cat', 'sub', 'valor', 'obs', 'log', 'extra', 'criadoEm', 'criadoPor'],
+  // base de faturamento da Diretoria (linhas de NF das abas SEMANAL da planilha de faturamento), importada por mês
+  FatHistorico: ['data', 'os', 'cli', 'canal', 'prod', 'corte', 'vUnit', 'qtd', 'valor', 'nf'],
   Clientes: ['nome'],
   Config: ['chave', 'valor'],
   Logs: ['em', 'por', 'tela', 'txt']
@@ -24,11 +26,11 @@ var SCHEMA = {
 var ABAS_OBSOLETAS = ['ContasHist', 'PrevRevisao', 'Listas', 'Página1', 'Sheet1'];
 
 // Coluna-chave de cada aba (null = aba sem chave, só leitura em bloco).
-var CHAVES = { Usuarios: 'nome', Sessoes: 'token', Clientes: 'nome', Config: 'chave', DreHistorico: null, Logs: null };
+var CHAVES = { Usuarios: 'nome', Sessoes: 'token', Clientes: 'nome', Config: 'chave', DreHistorico: null, FatHistorico: null, Logs: null };
 function chaveDe_(aba) { return Object.prototype.hasOwnProperty.call(CHAVES, aba) ? CHAVES[aba] : 'id'; }
 
 // Colunas guardadas como texto (datas aaaa-mm-dd e ids), para a planilha não converter.
-var COLUNAS_TEXTO = ['id', 'data', 'orig', 'pagoEm', 'dreId', 'entrega', 'recebidoEm', 'criadoEm', 'contaId', 'em', 'mes', 'token', 'nf', 'convite', 'forn', 'nome', 'cli', 'obs', 'chave', 'numero', 'banco', 'por'];
+var COLUNAS_TEXTO = ['id', 'data', 'orig', 'pagoEm', 'dreId', 'entrega', 'recebidoEm', 'criadoEm', 'contaId', 'em', 'mes', 'token', 'nf', 'convite', 'forn', 'nome', 'cli', 'obs', 'chave', 'numero', 'banco', 'por', 'os', 'canal', 'prod'];
 // Colunas com listas ou objetos, guardadas como JSON.
 var COLUNAS_JSON = ['hist', 'histEnt', 'log', 'subs', 'extra'];
 

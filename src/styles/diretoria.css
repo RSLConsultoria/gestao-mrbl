@@ -1,0 +1,171 @@
+/* Diretoria (Resultado, Despesas, Carteira) e filtro com caixinhas. Portado do protótipo aprovado. */
+/* padrão visual da Diretoria: cantos retos, texto em uma cor, cor só como marcador */
+body.dirx #app *,body.dirx #app *::before,body.dirx #app *::after,body.dirx #topBar .topacts *,#msfHost *{border-radius:0!important}
+body.dirx .panel{border-color:#C5CBD8}
+/* gráficos, legenda e dica */
+.fchart{position:relative;padding:4px 8px 0}.fchart svg{width:100%;height:auto;display:block}
+.fchart .gl{stroke:var(--line);stroke-width:1}.fchart .ax{font-size:12px;fill:var(--muted);font-family:var(--sans)}.fchart .dl{font-size:12px;fill:var(--ink);font-weight:600;font-family:var(--sans)}
+.ftip{position:absolute;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(11,26,85,.18);padding:8px 10px;font-size:12.5px;min-width:220px;pointer-events:none}
+.ftip b{display:block;margin-bottom:4px;color:var(--ink)}.ftip div{display:flex;align-items:center;gap:6px;color:var(--muted)}.ftip div span{margin-left:auto;color:var(--ink)}
+.ftip i,.flegend i{display:inline-block;width:10px;height:3px;border-radius:2px}.ftip .tt{border-top:1px solid var(--line);margin-top:4px;padding-top:4px;font-weight:700}
+.flegend{display:flex;flex-wrap:wrap;gap:16px;padding:6px 12px 12px;font-size:13px;color:var(--ink)}.flegend span{display:inline-flex;align-items:center;gap:6px}.flegend i{width:14px}
+.cptool{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 14px}
+.cptool .grow{flex:1}
+.cptool .seg{margin:0}
+.cpmbtn{display:inline-flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--ctrl);border-radius:8px;min-height:36px;padding:0 30px 0 10px;font:inherit;font-size:14px;cursor:pointer;color:var(--ink);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230E1530' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.cpmbtn span{color:var(--muted);font-weight:600}.cpmbtn span::after{content:':'}
+.cpmbtn b{font-weight:700}
+.cpmbtn.msfb.on{border-color:var(--navy)}.cpmbtn.msfb[aria-expanded="true"]{border-color:var(--navy);box-shadow:0 0 0 3px var(--blue-soft)}
+.msf{position:fixed;z-index:80;background:#fff;border:1px solid #767676;border-radius:6px;box-shadow:0 8px 24px rgba(11,26,85,.22);display:flex;flex-direction:column;font-size:14px;color:var(--ink)}
+.msfs{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid #eef0f3;color:var(--muted)}.msfs input{flex:1;min-width:0;border:0;outline:0;font:inherit;font-size:14px;color:var(--ink);background:transparent}
+.msfl{height:268px;overflow-y:auto;padding:2px 0}.msfl label{display:flex;align-items:center;gap:8px;padding:4px 10px;line-height:22px;cursor:pointer}.msfl label:hover{background:#e8effc}.msfl label span:not(.num){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.msfl input{accent-color:var(--navy);width:15px;height:15px;margin:0;flex:none}
+.msfl .msfall{position:sticky;top:-2px;background:#fff;border-bottom:1px solid #eef0f3;z-index:1}.msfl .msfall .num{margin-left:auto;color:var(--muted);font-size:12px}
+.msfmais{margin:0;padding:10px;color:var(--muted);font-size:13px}
+.msff .grow{flex:1}.msff>*{white-space:nowrap}.msff{display:flex;align-items:center;gap:10px;padding:7px 10px;border-top:1px solid #eef0f3;font-size:12.5px;color:var(--muted)}.msff .lnk{font-size:13px}.msff .lnk[disabled]{visibility:hidden}.pfth.pf2 .pfw+.pfw{margin-top:4px}.cpt tr.cpfil th{vertical-align:bottom}
+/* ============ Diretoria ============ */
+.dirw .dtool{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 14px}
+.dirw .dseg{margin:0}.dseg.sm button{padding:5px 12px;font-size:13px}
+.dirw .dper{color:var(--muted);font-size:13.5px}.dirw .dper b{color:var(--ink);font-weight:600}
+.dirw .kpi{border-top-width:3px}.dirw .kpi b{font-size:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dirw .kpi small{min-height:18px}
+.ddl{white-space:nowrap;font-variant-numeric:tabular-nums}.ddl i{font-style:normal;font-size:.72em;margin-right:4px;vertical-align:.12em}.ddl i.ok{color:#1E6B3A}.ddl i.bad{color:#B42318}.ddl i.z{color:var(--muted)}
+.dirw .dpan{margin:0 0 14px}.dirw .dpan .ph{padding:12px 16px 4px}.dirw .dpan .ph h2{font-size:16px}
+.dsub{color:var(--muted);font-size:13px;font-weight:400}
+.dchart{padding:4px 12px 0}.dchart .gl.z{stroke:var(--ctrl)}.dchart .dl.sm{font-size:11px;font-weight:600}.dchart .dl.in{font-size:11px;fill:#fff;font-weight:700}.dchart .ax.b{font-weight:700;fill:var(--ink)}
+.dchart .dmeta{stroke:var(--ink);stroke-width:2;stroke-dasharray:5 3}.dchart .dfade{opacity:.3}
+.dchart .dhit:hover{fill:rgba(16,37,116,.05)}
+.dirw .flegend{padding:6px 16px 12px;font-size:13px}.flegend i.lmeta{width:14px;height:0;border-top:2px dashed var(--ink);border-radius:0;background:none}
+.dirw .flegend i{width:10px;height:10px}
+.dtip{min-width:230px;z-index:5}.dtip div{gap:8px}
+.drow2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.drow2 .dpan{margin-bottom:14px}
+@media (max-width:1200px){.drow2{grid-template-columns:1fr}}
+.drosca{position:relative;display:grid;grid-template-columns:200px minmax(0,1fr);gap:16px;align-items:center;padding:6px 16px 16px}
+.drosca svg{width:200px;height:200px}.drosca .dtot{font-size:16px;font-weight:800}.drosca .dhit2{cursor:default}.drosca .dhit2:hover{opacity:.85}
+.dblks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0 0 14px}@media (max-width:1100px){.dblks{grid-template-columns:1fr}}
+.dblk{padding:14px 16px;border-top:3px solid var(--blue)}.dblk.ds{border-top-color:#eb6834}.dblk.rs{border-top-color:var(--yellow)}.dblk.rc{border-top-color:#2a78d6}
+.dblk h3{margin:0 0 10px;font-size:15px}.dbn{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}.dbn .w{grid-column:span 2;border-top:1px solid var(--line);padding-top:8px}
+.dbn span{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}.dbn b{font-size:19px;font-weight:700}
+table.dtab{min-width:0;width:100%}table.dtab th{white-space:nowrap}
+table.dtab tr.dgrp{cursor:pointer}table.dtab tr.dgrp:hover td{background:var(--blue-soft)}table.dtab tr.dgrp td:first-child{font-weight:600}
+table.dtab tr.dsubr td{color:var(--muted);font-size:13px;background:#FAFBFD}table.dtab tr.dsubr td:first-child{padding-left:44px}
+.dcar{display:inline-block;width:14px;color:var(--muted)}.dsw{display:inline-block;width:10px;height:10px;margin-right:8px;vertical-align:0}
+table.dcart td{white-space:nowrap}
+.dnota{color:var(--muted);font-size:13px;margin:0 0 14px}
+.dcfg{display:grid;gap:14px}.dcfg .ph{align-items:flex-start}.dcfg .ph h2{margin-bottom:4px}
+.dmetas{padding:0 16px 16px;display:grid;gap:12px}.dmetas .dmf{max-width:340px}.dmetas table{max-width:620px}
+.dmi{width:80px;text-align:right;min-height:32px;border:1px solid var(--ctrl);padding:0 8px;font:inherit}
+.dirw .kpi .ddl,.dirw .dbn .ddl,.dirw .kpi small .ddl{display:inline;font-size:inherit;letter-spacing:0;text-transform:none;color:inherit;font-weight:inherit}
+.dirw .kpi small .ddl{font-weight:600;color:var(--ink)}
+.dleg{display:grid;font-size:13px;min-width:0}.dli{display:grid;grid-template-columns:10px minmax(0,1fr) auto 52px;gap:8px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line)}.dli i{width:10px;height:10px}.dli .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dli .num{text-align:right;white-space:nowrap}
+.dcfg .ph>div{flex:1 1 420px}
+/* filtro (lista com caixinhas): sempre claro, caixinha desenhada */
+#msfHost .msf{color-scheme:light;background:#fff;border-color:var(--ctrl)}
+#msfHost .msfl{scrollbar-width:thin;scrollbar-color:#C5CBD8 #fff}
+#msfHost .msfl input[type=checkbox]{appearance:none;-webkit-appearance:none;width:16px;height:16px;margin:0;flex:none;border:1.5px solid #8A94AD;background:#fff;display:inline-grid;place-content:center;cursor:pointer}
+#msfHost .msfl input[type=checkbox]::before{content:"";width:9px;height:9px;transform:scale(0);background:#fff;clip-path:polygon(14% 44%,0 65%,50% 100%,100% 16%,80% 0,43% 62%)}
+#msfHost .msfl input[type=checkbox]:checked{background:var(--navy);border-color:var(--navy)}
+#msfHost .msfl input[type=checkbox]:checked::before{transform:scale(1)}
+#msfHost .msfl input[type=checkbox]:indeterminate{background:#fff;border-color:var(--navy)}
+#msfHost .msfl input[type=checkbox]:indeterminate::before{transform:scale(1);height:2px;clip-path:none;background:var(--navy)}
+#msfHost .msfl input[type=checkbox]:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+#msfHost .msfl label{padding:6px 12px}#msfHost .msfl label:hover{background:var(--blue-soft)}
+#msfHost .msfl label:has(input:checked) span:not(.num){font-weight:600}
+/* compacto: o máximo na tela sem rolar */
+.dirw .dtool{margin:0 0 10px}
+.dirw .kpis{gap:8px;margin-bottom:10px}
+.dirw .kpi{padding:8px 12px}.dirw .kpi span{margin-bottom:2px}.dirw .kpi small{min-height:0;margin-top:2px}
+.dirw .dpan .ph{padding:8px 16px 0}
+.dirw .flegend{padding:2px 16px 8px}
+.dirw .dchart{padding-top:0}
+.dirw .dblks{gap:12px;margin-bottom:12px}.dirw .dblk{padding:10px 14px}.dirw .dblk h3{margin-bottom:6px}.dirw .dbn{gap:6px 14px}.dirw .dbn b{font-size:17px}
+.dirw .drow2{gap:12px}.dirw .drow2 .dpan{margin-bottom:12px}
+.dirw .dnota{margin:4px 0 8px;font-size:12px}
+/* tamanho fixo: filtros e indicadores não mudam de tamanho com os dados */
+.dirw .dtool{flex-wrap:nowrap;min-width:0}
+.dirw .dtool .msfb{flex:none;width:190px;justify-content:flex-start;overflow:hidden;white-space:nowrap}
+.dirw .dtool #dirClis{width:250px}
+.dirw .dtool .msfb span{flex:none}.dirw .dtool .msfb b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dirw .dper{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dirw .kpi span,.dirw .kpi small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dirw .kpi small{height:17px;line-height:17px}
+.dirw .kpi b{height:26px;line-height:26px}
+.dirw .dbn>div{min-width:0}.dirw .dbn b,.dirw .dbn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* listas e tabelas: altura fixa, rolam por dentro */
+.dirw .drosca{height:232px}.dirw .drosca .dleg{max-height:216px;overflow-y:auto}
+.dirw .dpan .pscroll{height:420px;overflow:auto}
+.dirw .dcart{margin:0}
+.dirw .dtab thead th{position:sticky;top:0;z-index:1}
+.dirw .dbn b{height:22px;line-height:22px}.dirw .dblk h3{height:20px;line-height:20px}
+.dirw .dbn b,.dirw .dbn span{display:block}
+/* Resultado no formato de Recebimento e despesas */
+.dirw .dblk.dres{margin:0}
+.dbn3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 16px}
+.dbn3 .kpi{border:0;padding:4px 0;background:none;box-shadow:none;min-width:0}
+.dirw .dbn3 .kpi b{font-size:17px;height:22px;line-height:22px;margin:2px 0}
+.dbn3 .kpi:nth-child(n+4){border-top:1px solid var(--line);padding-top:8px}
+.dirw .drow2 .dpan{margin-bottom:0}
+/* sem rolagem nas legendas das roscas: cabem os 8 itens */
+.dirw .drosca{height:280px}.dirw .drosca .dleg{max-height:none;overflow:visible}
+/* tabela de despesas: sem caixa de rolagem (todos os grupos sempre aparecem) */
+.dirw .dpan .pscroll.dfull{height:auto;overflow:visible}
+/* barras de rolagem claras e finas (tabelas e lista do filtro) */
+.dirw .pscroll,#msfHost .msfl{scrollbar-width:thin;scrollbar-color:#C5CBD8 transparent}
+.dirw .pscroll::-webkit-scrollbar,#msfHost .msfl::-webkit-scrollbar{width:8px;height:8px}
+.dirw .pscroll::-webkit-scrollbar-thumb,#msfHost .msfl::-webkit-scrollbar-thumb{background:#C5CBD8}
+.dirw .pscroll::-webkit-scrollbar-track,#msfHost .msfl::-webkit-scrollbar-track{background:transparent}
+.dirw .pscroll::-webkit-scrollbar-button,#msfHost .msfl::-webkit-scrollbar-button{display:none;height:0}
+#msfHost .msfl.dirl{overflow:hidden}
+.dirw .ddl{line-height:1}.dirw .ddl i{vertical-align:1px}
+/* espaço entre as linhas de painéis */
+.dirw .drow2{margin-bottom:12px}
+/* rodapé do filtro: o texto encolhe, o botão Fechar nunca sai da caixa */
+#msfHost .msff .msfn{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#msfHost .msff .grow{flex:0 0 0}
+/* clique para filtrar */
+.dirw .clk{cursor:pointer}.dirw .flegend .clk:hover,.dirw .dli.clk:hover .n{text-decoration:underline}
+.dirw .dli.clk:hover{background:var(--blue-soft)}
+/* tabela Despesas por grupo */
+table.dgt{table-layout:fixed;border-collapse:collapse}
+table.dgt col.c-g{width:29%}table.dgt col.c-v{width:12.5%}table.dgt col.c-p{width:8%}table.dgt col.c-m{width:7%}table.dgt col.c-r{width:19%}table.dgt col.c-d{width:12%}
+table.dgt th,table.dgt td{padding:7px 12px}
+table.dgt tbody.dgb tr.dgl td{background:#fff;border-bottom:1px solid var(--line)}
+table.dgt tbody.dgb.zb tr.dgl td{background:#F5F6FA}
+table.dgt tbody.dgb tr.dgl:hover td{background:var(--blue-soft)}
+table.dgt tbody.dgb.ab tr.dgl td{background:#E9EDF7;border-bottom-color:#D5DBEA}
+.dgn{display:flex;align-items:center;gap:8px;min-width:0}
+.dexp{flex:none;width:22px;height:22px;display:inline-grid;place-content:center;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:11px;cursor:pointer;padding:0}
+span.dexp{border-color:transparent;background:none;cursor:default}
+.dexp:hover{border-color:var(--navy)}.dexp:focus-visible,.dfl:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
+.dgn .dsw{margin:0;flex:none}
+.dfl{border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--ink);cursor:pointer;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dfl:hover{text-decoration:underline}
+table.dgt tr.dsl td{background:#FBFCFE;border-bottom:1px solid #EEF0F5;font-size:13px;color:var(--ink);padding-top:5px;padding-bottom:5px}
+table.dgt tr.dsl td:first-child{box-shadow:inset 3px 0 0 #D5DBEA}
+table.dgt .dsn{display:block;padding-left:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.dgt .dsh{font-size:12px;color:var(--muted)}
+table.dgt tfoot td{border-top:2px solid var(--navy);font-weight:700;background:#fff}
+/* régua: barra = % do faturamento; marca = meta (no meio) */
+.drg{display:flex;align-items:center;gap:10px}
+.drb{position:relative;flex:1;height:8px;background:#E6E9F0}
+.drb i{position:absolute;left:0;top:0;bottom:0;background:#8A94AD}
+.drg.acima .drb i{background:#B42318}
+.drb b{position:absolute;left:50%;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:var(--ink)}
+.drg em{flex:none;width:78px;text-align:right;font-style:normal;font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums}
+.drg0{font-size:12px;color:var(--muted)}
+.dirw .dtool #dirDesp{width:270px}
+/* cabeçalho que ordena */
+.dth .dsort{border:0;background:none;padding:0;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.dth .dsort i{font-style:normal;font-size:10px;color:#A3AAB9}.dth.on .dsort i{color:var(--ink)}
+.dth .dsort:hover{text-decoration:underline}.dth .dsort:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+th.r.dth .dsort{flex-direction:row-reverse}
+/* TODAS as tabelas do sistema listradas. :where() = especificidade zero: qualquer fundo que uma tela já define (destaques, mapas de calor, linha aberta) continua valendo */
+:where(table) > :where(tbody) > :where(tr:nth-child(even)) > :where(td){background-color:#F5F6FA}
+:where(table) > :where(tbody) > :where(tr:nth-child(odd)) > :where(td){background-color:#fff}
+/* na Carteira: listra também nas linhas de cliente, e as subdivisões abertas ficam num tom só */
+.dirw table.dcart tr.dsubr td{background:#FBFCFE}
+
+/* menu: títulos dos grupos (só no menu lateral) */
+.tabs .tabh{display:none}
+@media (min-width:900px){
+  .tabs .tabh{display:block;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 12px 4px}
+  .tabs .tabh:first-child{padding-top:0}
+}

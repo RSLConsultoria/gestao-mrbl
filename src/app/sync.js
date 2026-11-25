@@ -2,7 +2,7 @@
 // na próxima, compara registro a registro pelo id. As gravações saem em fila, na ordem em que foram feitas.
 export const COLECOES = { contas: 'Contas', saidas: 'Despesas', entradas: 'Entradas', previsoes: 'Previsoes', fornecedores: 'Fornecedores', parcelamentos: 'Parcelamentos', cheques: 'Cheques', saldosBanco: 'SaldosBanco', semData: 'ContasSemData' };
 
-const configDe = (S) => ({ prazoOficinas: S.prazoOf, prevRevisao: JSON.stringify(S.prevReview || {}), oficinasFixas: JSON.stringify(S.ofFixas || []), relFoto: JSON.stringify(S.relFoto || null) });
+const configDe = (S) => ({ prazoOficinas: S.prazoOf, prevRevisao: JSON.stringify(S.prevReview || {}), oficinasFixas: JSON.stringify(S.ofFixas || []), relFoto: JSON.stringify(S.relFoto || null), dirMetas: JSON.stringify(S.dirMetas || null), dirMetaFat: S.dirMetaFat == null ? null : S.dirMetaFat });
 
 export function fotografar(S) {
   const f = {};
@@ -30,6 +30,8 @@ export function diferenca(antes, S) {
   if (cAnt.prevRevisao !== cNovo.prevRevisao) cfg.prevRevisao = JSON.parse(cNovo.prevRevisao);
   if (cAnt.oficinasFixas !== cNovo.oficinasFixas) cfg.oficinasFixas = JSON.parse(cNovo.oficinasFixas);
   if (cAnt.relFoto !== cNovo.relFoto && S.relFoto) cfg.relFoto = JSON.parse(cNovo.relFoto);
+  if (cAnt.dirMetas !== cNovo.dirMetas && S.dirMetas) cfg.dirMetas = JSON.parse(cNovo.dirMetas);
+  if (cAnt.dirMetaFat !== cNovo.dirMetaFat && S.dirMetaFat != null) cfg.dirMetaFat = cNovo.dirMetaFat;
   if (Object.keys(cfg).length) { mud.Config = cfg; vazio = false; }
   return { mud, vazio };
 }

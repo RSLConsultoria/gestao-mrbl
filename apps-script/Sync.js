@@ -1,7 +1,7 @@
 // Sincronização das telas com a planilha.
 // As telas carregam tudo ao entrar (dados.carregar) e, a cada ação, mandam só o que mudou (sync.aplicar).
 var ABAS_APP = { Contas: 'contas', Despesas: 'saidas', Entradas: 'entradas', Previsoes: 'previsoes', Fornecedores: 'fornecedores', Clientes: 'clientes', Parcelamentos: 'parcelamentos', Cheques: 'cheques', SaldosBanco: 'saldosBanco', ContasSemData: 'semData' };
-var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto'];
+var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto', 'dirMetas', 'dirMetaFat'];
 
 var Sync = {
   // Objeto do app -> linha da aba. Campos sem coluna vão para "extra".
@@ -40,6 +40,7 @@ var Sync = {
       out[ABAS_APP[aba]] = Db.todos(aba).map(function (r) { return Sync.doLinha(aba, r); });
     });
     out.dreHistorico = Db.todos('DreHistorico');
+    out.fatHistorico = Db.todos('FatHistorico');
     var admin = Sync.admins().indexOf(sess.usuario) >= 0;
     out.admin = admin;
     out.usuarios = Db.todos('Usuarios').filter(function (u) { return String(u.ativo).toUpperCase() !== 'FALSE'; }).map(function (u) {

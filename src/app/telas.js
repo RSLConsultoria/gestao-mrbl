@@ -2,6 +2,7 @@
 // O estado vem do servidor (dados.carregar) e cada ação grava na planilha só o que mudou (ver sync.js).
 /* eslint-disable */
 import { lerFluxoConsolidado } from './historico.js';
+import { criarDiretoria, DIR_TELAS, DIR_TITULO } from './diretoria.js';
 const LISTAS = {"DESPESAS COM FUNCIONARIOS": ["SALARIOS", "SALARIOS PJ", "PLANO DE SAUDE", "CONVENIOS FARMACIA / LOJA", "PREMIO", "REEMBOLSO", "RESCISÃO", "ACORDO TRABALHISTA", "UNIFORME/SAPATOS/EPI", "FERIAS", "VALE ALIMETAÇÃO/ VALE REFEIÇÃO", "SEGURO DE VIDA", "PENSÃO", "EMPRESTIMOS", "HORAS EXTRAS", "VALE TRANSPORTE", "CURSOS/ TREINAMENTOS", "OUTRAS DIVERSAS RH (ALIMENTAÇÃO)", "ATESTADO MEDICO ADMIS / DEMISSIONAL /EXAME MEDICO", "13 SALARIO"], "ENCARGOS SOCIAIS": ["INSS / GPS", "IRRF", "IRRF ( PARCELAMENTO)", "DARF", "GRRF", "SINDICATO / ISS", "FGTS (PARCELAMENTO)", "FGTS"], "DESPESAS COM UTILITARIOS E SERVIÇOS": ["AGUA E ESGOTO", "ENERGIA ELETRICA", "TELEFONE FIXO", "TELEFONE CELULAR", "INTERNET", "OUTROS / DIVERSOS"], "DESPESAS TRIBUTARIAS FEDERAIS": ["PIS", "COFINS", "IRPJ", "CSSLL", "DAS", "IPI", "DAE", "ICMS", "PARCELAMENTO ICMS"], "DESPESAS TRIBUTARIAS MUNICIPAIS": ["IPTU (OUTRAS TAXAS EM GERAL)"], "DESPESAS COM VENDAS E MKT": ["PATROCINIO", "PROPAGANDA/MARKETING", "VEICULOS DE COMUNICAÇÃO", "BONIFICAÇÃO PARA PARCEIROS", "CONSULTAS DE CREDITO (SERASA)", "COMISSOES/GRATIFICAÇÕES", "ASSOCIAÇÕES E SINDICATOS", "OUTRAS"], "DESPESAS ADMINISTRATIVA": ["MATERIAL DE ESCRITORIO", "CARTÃO DE CREDITO", "CORREIO", "MOTOTAXI / ENTREGAS RAPIDAS", "CONSULTORIA/ADVOGADOS", "CONTABILIDADE", "CAIXA INTERNO", "COMPRA EQUIPAMENTOS / MOVÉIS E UTENSÍLIOS", "MANUTENÇÃO DE MÁQUINAS", "MATERIAL USO CONSUMO", "MATERIAL DE EMBALAGENS", "INFORMATICA/SISTEMA", "RECRUTAMENTO ( PUPLICAÇÃO VAGA EMPREGO)", "DESPESA DE VIAGEM / HOSPEDAGEM / CONDOMINIO", "SEM PARAR", "SEGURO EMPRESA", "TAXAS DIVERSAS (CARTORIO)", "ALARME MONITORADO/SEGURANÇA", "LIMPEZA EM GERAL", "TAXAS DIVERSAS"], "ACESSORIAS": ["ACESSORIAS EM GERAL (OF)", "ACESSORIAS EM GERAL (OF) SN", "TERCEIRIZADOS (PJ)", "PASSIVOS DIVERSOS (CO/ST)"], "MANUTENCAO PREDIAL": ["MATERIAIS P/ CONSTRUÇÃO E FERRAMENTAS", "COLETA DE RESIDUOS", "ELEVADOR"], "PREJUIZOS": ["USO E CONSUMO", "PERDAS EM GERAL"], "DESPESAS FINANCEIRAS": ["CAPITALIZAÇÃO E SEGUROS", "TARIFA DIVERSAS + JUROS", "AMORTIZAÇÃO CONTA GARANTIA", "DEVOLUÇÕES DUPLICIDADE TÍTULOS", "ESTORNO", "TAXA DE ANTECIPAÇÃO DE RECEBIVEIS", "PROFINANCE ( EMPRESTIMO)", "TRANSFERENCIA"], "FINANCIAMENTOS": ["FINANCIAMENTO BNDES / PRONAMPE", "CONSÓRCIO / EMPRÉSTIMOS", "VEICULOS E OUTROS"], "PRÓ-LABORE": ["DIRETORIA", "INVESTIMENTOS PESSOAIS"], "AQUISIÇÕES / INVESTIMENTOS": ["COMPRA DE MAQUINAS", "ANIMALE ( EMPRESTIMO SEDA )", "CONSTRUÇÃO EM ANDAMENTO"], "MANUTENÇAO VEICULAR": ["TRIBUTOS (IPVA / LICENCIAMENTO / OUTROS / MULTAS )", "SEGURO CARRO", "COMBUSTÍVEL", "MANUTENÇÃO / PEÇAS DE VEÍCULOS"], "PROVISAO": ["FESTA FINAL DE ANO", "13º SALARIO", "FÉRIAS"], "ALUGUEL": ["ALUGUEL"], "FORNECEDORES (CMV)": ["FORNECEDORES"], "FRETE": ["FRETE"]};
 const EMPS = ["MRBL", "STOFFA"];
 const ECATS = ["RECEBIMENTO DE CLIENTE", "DEVOLUÇÃO", "RECEBIMENTO MRBL", "RECEBIMENTO STOFFA", "EMPRÉSTIMO PROFINANCE", "ANTECIPAÇÃO"];
@@ -43,7 +44,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     usuarios: (dados.usuarios || []).map((u) => u.nome), senhas: Object.fromEntries((dados.usuarios || []).map((u) => [u.nome, !!u.temSenha])),
     convites: Object.fromEntries((dados.usuarios || []).filter((u) => u.convite).map((u) => [u.nome, u.convite])),
     user: dados.usuario, logs: dados.logs || [],
-    relFoto: CFG.relFoto && typeof CFG.relFoto === 'object' ? CFG.relFoto : null
+    relFoto: CFG.relFoto && typeof CFG.relFoto === 'object' ? CFG.relFoto : null,
+    // metas da Diretoria (Configurações › Diretoria); null = padrão do Power BI
+    dirMetas: CFG.dirMetas && typeof CFG.dirMetas === 'object' ? CFG.dirMetas : null, dirMetaFat: CFG.dirMetaFat == null || CFG.dirMetaFat === '' ? null : +CFG.dirMetaFat
   };
   S.previsoes.forEach((p) => { if (!Array.isArray(p.subs)) p.subs = p.subs ? String(p.subs).split(';').map((x) => x.trim()).filter(Boolean) : []; });
   S.contas.forEach((c) => { if (!c.hist) c.hist = c.orig && c.orig !== c.data ? [{ de: c.orig, para: c.data, em: null }] : []; });
@@ -263,6 +266,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   function modalHTML(){
     if (!view.modal) return '';
     if (view.modal === 'pvimp') return pvImpHTML();
+    if (view.modal === 'dir:imp') return DIR.modal();
     if (view.modal === 'lanc') return lancModalHTML();
     if (view.modal === 'parcnew' || view.modal === 'parcedit') return parcModalHTML();
     if (view.modal === 'sd') return sdModalHTML();
@@ -570,6 +574,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       '<div class="kpi' + (venc.length ? ' kd' : '') + '"><span>Parcelas vencidas</span><b class="num">' + money(vencTot) + '</b><small>' + (venc.length ? venc.length + ' parcela' + (venc.length === 1 ? '' : 's') + ' sem pagamento' : 'Nenhuma vencida') + '</small></div>' +
       (() => { const ab = (S.cheques || []).filter((q) => ['aberto', 'enviado'].includes(chqSit(q).k)), tot = ab.reduce((x, q) => x + chqValor(q), 0), fora = ab.filter((q) => chqSit(q).k === 'aberto').length;
         return '<div class="kpi"><span>Cheques em aberto</span><b class="num">' + money(tot) + '</b><small>' + ab.length + ' cheque' + (ab.length === 1 ? '' : 's') + (fora ? ' · ' + fora + ' fora de Contas a pagar' : '') + '</small></div></div>'; })();
+    h += DIR.parcPainel();  // parcelas a pagar nos próximos 12 meses (mesmo gráfico do painel da Diretoria)
     h += '<section class="panel"><div class="ph"><h2>Parcelamentos</h2><div class="pfil">' +
       chip('parcEmp', 'todas', 'Todas') + EMPS_P.map((e) => chip('parcEmp', e, e)).join('') + '<span class="sep"></span>' +
       chip('parcSit', 'ativos', 'Em andamento') + chip('parcSit', 'quitados', 'Quitados') + chip('parcSit', 'todos', 'Todos') + '</div></div>';
@@ -928,7 +933,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     try { renderCore(); }
     catch (err) {
       console.error(err);
-      document.getElementById('app').innerHTML = '<div class="today"><h1>' + esc(({ pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações' })[view.tela] || '') + '</h1></div><section class="panel" style="padding:18px;border-color:var(--danger)"><b style="color:var(--danger-ink)">Esta tela não abriu.</b><p style="margin:6px 0;color:var(--muted);font-size:14px">Recarregue a página. Se continuar, mande um print desta mensagem para o Lucca. Detalhe técnico: <code>' + esc(String(err && err.message || err)) + '</code></p><button type="button" class="btn" onclick="location.reload()">Recarregar</button></section>';
+      document.getElementById('app').innerHTML = '<div class="today"><h1>' + esc(({ pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório de despesas', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações', ...DIR_TITULO })[view.tela] || '') + '</h1></div><section class="panel" style="padding:18px;border-color:var(--danger)"><b style="color:var(--danger-ink)">Esta tela não abriu.</b><p style="margin:6px 0;color:var(--muted);font-size:14px">Recarregue a página. Se continuar, mande um print desta mensagem para o Lucca. Detalhe técnico: <code>' + esc(String(err && err.message || err)) + '</code></p><button type="button" class="btn" onclick="location.reload()">Recarregar</button></section>';
     }
     { const tt = document.getElementById('topTitle'); const td = document.querySelector('#app > .today'); tt.innerHTML = ''; if (td) tt.appendChild(td); }
     document.getElementById('modalHost').innerHTML = modalHTML();
@@ -941,7 +946,10 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     document.getElementById('btnNew').textContent = view.tela === 'of' ? '+ Nova entrega' : view.tela === 'parc' ? '+ Novo parcelamento' : '+ Nova conta';
     { const gs = document.getElementById('gSearch'); if (gs) gs.placeholder = view.tela === 'of' ? 'Buscar oficina' : 'Buscar fornecedor ou categoria'; }
     { const ub = document.getElementById('userBox'); if (ub) ub.innerHTML = 'Conectado como<span class="ub-name">' + esc(S.user) + '</span><button type="button" class="ub-out" id="btnSair">Sair</button>'; }
-    document.getElementById('btnNew').hidden = ['pr','rel','dre','drel','cfg'].includes(view.tela);
+    document.getElementById('btnNew').hidden = ['pr','rel','dre','drel','cfg'].includes(view.tela) || DIR_TELAS.includes(view.tela);
+    // Diretoria: cantos retos e sem a busca de contas no topo
+    document.body.classList.toggle('dirx', DIR_TELAS.includes(view.tela));
+    { const gb = document.querySelector('#topBar .gsearch'); if (gb) gb.hidden = DIR_TELAS.includes(view.tela); }
     document.getElementById('btnPdf').hidden = view.tela !== 'rel';
     document.getElementById('btnXls').hidden = view.tela !== 'dre' && view.tela !== 'drel';
     if (view.tela === 'parc') return renderParc();
@@ -951,6 +959,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (view.tela === 'dre') return renderDre();
     if (view.tela === 'drel') return renderDrel();
     if (view.tela === 'cfg') return renderCfg();
+    if (DIR_TELAS.includes(view.tela)) { document.getElementById('app').innerHTML = DIR.render(); return; }
     const app = document.getElementById('app');
     // oficina que ainda não chegou fica só na tela Oficinas; entra em Contas a pagar quando chega (ou se já foi paga)
     const CP = S.contas.filter(naPagar);
@@ -1118,8 +1127,8 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const app = document.getElementById('app');
     const tab = view.cfgTab || 'listas';
     let h = '<div class="today"><h1>Configurações</h1></div>';
-    h += '<div class="seg" role="tablist" aria-label="Seções"><button type="button" role="tab" data-cfgtab="listas" aria-selected="' + (tab === 'listas') + '">Listas de fornecedores</button><button type="button" role="tab" data-cfgtab="prev" aria-selected="' + (tab === 'prev') + '">Previsões' + (reviewPending() ? ' <i class="dotp" title="Revisão pendente"></i>' : '') + '</button><button type="button" role="tab" data-cfgtab="logs" aria-selected="' + (tab === 'logs') + '">Usuários e logs</button></div>';
-    h += tab === 'prev' ? cfgPrev() : tab === 'logs' ? cfgLogs() : cfgListas();
+    h += '<div class="seg" role="tablist" aria-label="Seções"><button type="button" role="tab" data-cfgtab="listas" aria-selected="' + (tab === 'listas') + '">Listas de fornecedores</button><button type="button" role="tab" data-cfgtab="prev" aria-selected="' + (tab === 'prev') + '">Previsões' + (reviewPending() ? ' <i class="dotp" title="Revisão pendente"></i>' : '') + '</button><button type="button" role="tab" data-cfgtab="dir" aria-selected="' + (tab === 'dir') + '">Diretoria</button><button type="button" role="tab" data-cfgtab="logs" aria-selected="' + (tab === 'logs') + '">Usuários e logs</button></div>';
+    h += tab === 'prev' ? cfgPrev() : tab === 'logs' ? cfgLogs() : tab === 'dir' ? DIR.cfg() : cfgListas();
     app.innerHTML = h;
   }
   function cfgListas(){
@@ -1142,7 +1151,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const us = S.usuarios, f = view.logUser || '', q = (view.logQ || '').trim().toUpperCase();
     const L = (S.logs || []).filter((x) => (!f || x.por === f) && (!q || x.txt.toUpperCase().includes(q)));
     const nPg = Math.max(1, Math.ceil(L.length / 15)); const pg = Math.min(view.logPg || 0, nPg - 1); view.logPg = pg;
-    const TELA = { pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações', login: 'Login' };
+    const TELA = { pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório de despesas', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações', login: 'Login', dir: 'Diretoria', ...DIR_TITULO };
     let h = '<div class="lgrid"><section class="panel lpane"><div class="lhead"><div><h2>Usuários</h2><small>Quem está logado: <b>' + esc(S.user) + '</b>. Cada um entra com a própria senha.</small></div></div><table class="ltab utab"><tbody>' +
       us.map((u) => '<tr><td>' + esc(u) + (u === S.user ? ' <span class="chip c-open" style="margin-left:6px">usando agora</span>' : '') + '</td><td class="r">' + (S.senhas && S.senhas[u] ? (ADMIN ? '<button type="button" class="btn sm" data-resetpw="' + esc(u) + '" title="Apaga a senha e gera um código de convite. A pessoa cria outra senha com esse código.">Redefinir senha</button>' : '') : '<small style="color:var(--muted)">sem senha ainda' + (S.convites[u] ? ' · convite <b class="num">' + esc(S.convites[u]) + '</b>' : '') + '</small>') + '</td></tr>').join('') +
       (ADMIN ? '<tr class="ladd"><td><input id="uNome" placeholder="Novo usuário" autocomplete="off"></td><td class="r"><button type="button" class="btn sm y" id="uAdd">Adicionar</button></td></tr>' : '') + '</tbody></table></section>';
@@ -1428,7 +1437,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const CH = gran === 'sem' ? W : D;
     const val = view.relVal || 'all';
     const pick = (x) => val === 'pago' ? x.pago : val === 'prev' ? x.aberto + x.prev : x.pago + x.aberto + x.prev;
-    let h = '<div class="today"><h1>Relatório</h1><span class="sub">Custo por mês: o que já foi pago e o que ainda está previsto pagar.</span></div>';
+    let h = '<div class="today"><h1>Relatório de despesas</h1><span class="sub">Custo por mês: o que já foi pago e o que ainda está previsto pagar.</span></div>';
     // KPIs
     const tP = sum(DS.map((o) => ({ valor: o.pago }))), tA = sum(DS.map((o) => ({ valor: o.aberto }))), tV = sum(DS.map((o) => ({ valor: o.prev })));
     const fimAno = CUR.slice(0,4) + '-12'; const resto = []; for (let m = CUR; m <= fimAno; m = mAdd(m, 1)) resto.push(repMonth(m));
@@ -2880,7 +2889,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       Object.keys(rows).forEach((k) => { const r = rows[k]; lines.push([k, ''].concat(r.v.map(num), [num(r.v.reduce((a,b)=>a+b,0)), prevCat[k] ? num(prevCat[k]) : '']).join('\t'));
         Object.keys(r.subs).forEach((sk) => { const sv = r.subs[sk]; lines.push([k, sk].concat(sv.map(num), [num(sv.reduce((a,b)=>a+b,0)), prevSub[k + '|' + sk] ? num(prevSub[k + '|' + sk]) : '']).join('\t')); }); });
       const txt = lines.join('\n');
-      try { navigator.clipboard.writeText(txt).then(() => toast('Relatório copiado. Cole no Excel com Ctrl+V.', false), () => toast('Não foi possível copiar neste navegador.', false)); } catch (err) { toast('Não foi possível copiar neste navegador.', false); }
+      try { navigator.clipboard.writeText(txt).then(() => toast('Relatório de despesas copiado. Cole no Excel com Ctrl+V.', false), () => toast('Não foi possível copiar neste navegador.', false)); } catch (err) { toast('Não foi possível copiar neste navegador.', false); }
       return;
     }
     if (view.tela === 'pr') {
@@ -2904,6 +2913,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const fallback = () => { const o = document.getElementById('copyOut'); o.innerHTML = '<textarea class="copybox" readonly aria-label="Tabela para copiar">' + esc(txt) + '</textarea>'; const ta = o.querySelector('textarea'); ta.focus(); ta.select(); toast('Copie com Ctrl+C a tabela que apareceu no rodapé.', false); };
     try { navigator.clipboard.writeText(txt).then(() => toast(rows.length + ' linhas copiadas. Cole no Excel com Ctrl+V.', false), fallback); } catch (err) { fallback(); }
   }
+  const DIR = criarDiretoria({ getS: () => S, view, render, act, toast, api, esc, money, num, pad, cap, MESES, MES3, mesNome, mAdd, CUR, agora, cellVal, normTxt,
+    carregarExcel: () => loadJs(XLS), admin: ADMIN, fat: dados.fatHistorico || [], imp: CFG.dirFatImp,
+    DRE_ANO: +DRE_MESES[0].slice(0, 4), dreData, histAno, parcInfo, chqSit, chqValor });
   render();
   return { recarregar: (d) => d };
 }

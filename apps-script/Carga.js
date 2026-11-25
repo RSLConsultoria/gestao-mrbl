@@ -45,7 +45,7 @@ acao_('carga.importar', function (d, s) {
 
 // Apaga todos os dados do app para uma nova carga. Mantém usuários, sessões e configurações.
 // Só pelo editor do Apps Script (Executar), nunca pelo app.
-var ABAS_DADOS = ['Contas', 'Despesas', 'Entradas', 'DreHistorico', 'Previsoes', 'Fornecedores', 'Clientes', 'Parcelamentos', 'Cheques', 'SaldosBanco', 'ContasSemData', 'Logs'];
+var ABAS_DADOS = ['Contas', 'Despesas', 'Entradas', 'DreHistorico', 'Previsoes', 'Fornecedores', 'Clientes', 'Parcelamentos', 'Cheques', 'SaldosBanco', 'ContasSemData', 'FatHistorico', 'Logs'];
 function apagarDados() {
   var ss = SpreadsheetApp.getActive(), trava = LockService.getScriptLock();
   trava.waitLock(30000);
@@ -78,5 +78,35 @@ acao_('historico.importar', function (d, s) {
     Db.substituir('DreHistorico', outras.concat(linhas.map(function (l) { return { mes: String(l.mes), tipo: l.tipo, cat: l.cat || '', sub: l.sub || '', valor: Math.round((+l.valor || 0) * 100) / 100 }; })));
     Logs.registrar(s.usuario, 'dre', 'Importou o histórico de ' + ano + ' do Fluxo de Caixa (' + linhas.length + ' linhas)');
     return { linhas: linhas.length, ano: ano };
+  } finally { trava.releaseLock(); }
+});
+
+// Base de faturamento da Diretoria. A planilha do faturamento (abas SEMANAL) é lida no navegador de quem importa;
+// aqui só troca as linhas dos meses que vieram no arquivo (mês importado manda) e guarda o registro da importação.
+acao_('faturamento.importar', function (d, s) {
+  Usuarios.exigirAdmin_(s);
+  var linhas = d.linhas || [];
+  if (!linhas.length) throw Auth.erro('faturamento_vazio', 'O arquivo não trouxe linhas faturadas.');
+  var num = function (v) { var x = +v; return isFinite(x) ? Math.round(x * 100) / 100 : 0; };
+  var txt = function (v) { return v === null || v === undefined ? '' : String(v).slice(0, 200); };
+  var meses = {};
+  var novas = linhas.map(function (l) {
+    var data = String(l.data || '');
+    if (!/^\d{4}-\d\d-\d\d$/.test(data)) throw Auth.erro('faturamento_data', 'Linha com data inválida: ' + data + '.');
+    meses[data.slice(0, 7)] = true;
+    return { data: data, os: txt(l.os), cli: txt(l.cli), canal: txt(l.canal), prod: txt(l.prod), corte: l.corte == null ? '' : num(l.corte), vUnit: l.vUnit == null ? '' : num(l.vUnit), qtd: num(l.qtd), valor: num(l.valor), nf: txt(l.nf) };
+  });
+  var lista = Object.keys(meses).sort();
+  var trava = LockService.getScriptLock();
+  trava.waitLock(30000);
+  try {
+    var outras = Db.todos('FatHistorico').filter(function (r) { return !meses[String(r.data).slice(0, 7)]; });
+    Db.substituir('FatHistorico', outras.concat(novas));
+    var reg = Sync.config().dirFatImp;
+    reg = Array.isArray(reg) ? reg : [];
+    reg.push({ em: agora_(), por: s.usuario, arquivo: txt(d.arquivo), meses: lista });
+    Db.gravarLote('Config', [{ chave: 'dirFatImp', valor: JSON.stringify(reg.slice(-30)) }], []);
+    Logs.registrar(s.usuario, 'cfg', 'Importou o faturamento de ' + lista.length + ' meses (' + lista[0] + ' a ' + lista[lista.length - 1] + ', ' + novas.length + ' linhas)');
+    return { linhas: novas.length, meses: lista };
   } finally { trava.releaseLock(); }
 });
