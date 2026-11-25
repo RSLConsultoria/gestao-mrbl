@@ -390,7 +390,7 @@ export function criarDiretoria(ctx){
     if (!mt) return '<span class="drg0">sem meta</span>';
     if (pf == null) return '—';
     const m = mt / 100, w = Math.min(1, pf / (2 * m)), acima = pf > m;
-    return '<div class="drg' + (acima ? ' acima' : '') + '" title="' + (acima ? 'Acima' : 'Abaixo') + ' da meta em ' + dirPP(Math.abs(pf - m)) + '"><span class="drb"><i style="width:' + (w * 100).toFixed(1) + '%"></i><b></b></span><em>' + (acima ? '+' : '−') + dirPP(Math.abs(pf - m)) + '</em></div>';
+    return '<div class="drg' + (acima ? ' acima' : '') + '" title="' + (acima ? 'Acima' : 'Abaixo') + ' da meta em ' + dirPP(Math.abs(pf - m)) + '"><span class="drb"><i style="width:' + (w * 100).toFixed(1) + '%"></i><b></b></span></div>';
   }
 
   // ================= 4. PARCELAMENTOS FUTUROS =================
