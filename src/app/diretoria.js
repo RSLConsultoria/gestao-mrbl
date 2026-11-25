@@ -510,7 +510,7 @@ export function criarDiretoria(ctx){
       '<div class="dmetas"><label class="ff dmf"><span>Meta de faturamento (R$ por mês, igual em todos os meses)</span><input id="dMetaFat" inputmode="decimal" value="' + num(metaFat()) + '"></label>' +
       '<table class="ptab dtab"><thead><tr><th>Grupo de despesa</th><th class="r">Meta (% do faturamento)</th></tr></thead><tbody>' +
       DIR_GRP.map(([k, n]) => '<tr><td>' + esc(n) + '<small>' + esc(k) + '</small></td><td class="r"><input class="dmi" data-dmeta="' + esc(k) + '" inputmode="decimal" value="' + (mt[k] ? String(mt[k]).replace('.', ',') : '') + '" placeholder="sem meta" aria-label="Meta de ' + esc(n) + '"> %</td></tr>').join('') + '</tbody></table></div></section>';
-    h += '<section class="panel"><div class="ph"><div><h2>Histórico do Fluxo de Caixa ' + (ANO - 1) + '</h2><small class="dsub">' + (h25 ? 'Carregado. ' : 'Ainda não importado. ') + 'Recebimentos e despesas de ' + (ANO - 1) + ' (comparação em Diretoria › Despesas) vêm do histórico do Fluxo de Caixa: Fluxo de Caixa › Visão comparativa › Importar.</small></div></div></section></div>';
+    h += '<section class="panel"><div class="ph"><div><h2>Histórico do Fluxo de Caixa ' + (ANO - 1) + '</h2><small class="dsub">' + (h25 ? 'Carregado. ' : 'Ainda não importado. ') + 'Recebimentos e despesas de ' + (ANO - 1) + ' usados na comparação de Diretoria › Despesas.</small></div></div></section></div>';
     return h;
   }
   async function dirLerExcel(file){
