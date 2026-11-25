@@ -93,3 +93,10 @@ table.cmpt th:not(:first-child),table.cmpt td:not(:first-child){min-width:120px}
 table.rel.rep.muitas td,table.rel.rep.muitas th{padding-left:6px;padding-right:6px;font-size:13px}
 table.rel.rep.muitas th:first-child{min-width:220px!important}
 table.rel.rep.muitas th:last-child{width:120px!important}
+
+/* Configurações › Usuários: coluna da direita do tamanho do botão, sem quebrar */
+.lg2 .utab{table-layout:auto}
+.lg2 .utab td{padding:7px 14px}
+.lg2 .utab td.r{width:1%!important;white-space:nowrap}
+.lg2 .utab td:first-child{max-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.utab .usem{color:var(--muted);line-height:1.35;display:inline-block;text-align:right}
