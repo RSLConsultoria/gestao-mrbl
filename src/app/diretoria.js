@@ -283,6 +283,17 @@ export function criarDiretoria(ctx){
   const dirCmp = (o, get) => (a, b) => { const x = get(a, o.k), y = get(b, o.k); return (typeof x === 'string' ? x.localeCompare(y, 'pt-BR') : (x || 0) - (y || 0)) * (o.d > 0 ? 1 : -1); };
   const dirKpi = (lab, val, small, cls) => '<div class="kpi' + (cls ? ' ' + cls : '') + '"><span title="' + dirTit(lab) + '">' + lab + '</span><b class="num" title="' + dirTit(val) + '">' + val + '</b><small title="' + dirTit(small) + '">' + (small || '&nbsp;') + '</small></div>';
 
+  // meses dos gráficos de proporção: sem filtro, os 24 meses (ano anterior e ano); com Trimestre ou Meses, só os
+  // meses escolhidos, nos dois anos. A cor de cada grupo/cliente vem sempre dos 24 meses, para não mudar com o filtro.
+  function dirMesesGraf(ano){
+    const V = dirV(), filtra = V.tris.length || V.meses.length;
+    const ms = Array.from({ length: 12 }, (_, i) => i + 1).filter((m) => !filtra || ((!V.tris.length || V.tris.includes(dirTriDe(m))) && (!V.meses.length || V.meses.includes(String(m)))));
+    const mks = [], cats = [], m24 = [];
+    [ano - 1, ano].forEach((a) => { ms.forEach((m) => { mks.push(a + '-' + pad(m)); cats.push(cap(MES3[m - 1])); }); for (let m = 1; m <= 12; m++) m24.push(a + '-' + pad(m)); });
+    const n = ms.length;
+    return { mks, cats, m24, sep: [[0, n - 1, String(ano - 1)], [n, 2 * n - 1, String(ano)]], filtra: !!filtra && n < 12 };
+  }
+
   // ================= 1. RESULTADO =================
   function dirRenderRes(){
     const P = dirPer(), ano = P.ano, rows = dirFat(), FM = dirFatMes(rows);
@@ -337,11 +348,11 @@ export function criarDiretoria(ctx){
     const somaE = (ms) => { const t = {}; ms.forEach((mk) => Object.entries(ent(mk)).forEach(([k, v]) => { t[k] = (t[k] || 0) + v; })); return t; };
     const nomeE = (k) => um ? k : dirGNome(k);
     const T = somaE(P.ms), TA = somaE(P.prev), tot = dirSum(Object.values(T)), totA = dirSum(Object.values(TA));
-    const mks = [], cats = []; [ano - 1, ano].forEach((a) => MES3.forEach((m, i) => { mks.push(a + '-' + pad(i + 1)); cats.push(cap(m)); }));
-    const all = {}; mks.forEach((mk) => Object.entries(ent(mk)).forEach(([k, v]) => { all[k] = (all[k] || 0) + v; }));
+    const { mks, cats, m24, sep, filtra } = dirMesesGraf(ano);
+    const all = {}; m24.forEach((mk) => Object.entries(ent(mk)).forEach(([k, v]) => { all[k] = (all[k] || 0) + v; }));
     const C = dirTopN(all, 8), cor = (k) => C.cor[k] || DIR_OUTROS;
     // cor dos grupos na tabela: sempre a do ranking geral (não muda com o filtro)
-    const allG = {}; mks.forEach((mk) => Object.entries(Dp.G[mk] || {}).forEach(([k, v]) => { allG[k] = (allG[k] || 0) + v; }));
+    const allG = {}; m24.forEach((mk) => Object.entries(Dp.G[mk] || {}).forEach(([k, v]) => { allG[k] = (allG[k] || 0) + v; }));
     const CG = dirTopN(allG, 8), corG = (k) => CG.cor[k] || DIR_OUTROS;
     const itens = (t) => { const out = C.top.map((k) => ({ nome: nomeE(k), cor: C.cor[k], v: t[k] || 0, key: um ? null : k })); const o = dirSum(C.outros.map((k) => t[k] || 0)); if (o) out.push({ nome: 'Outros', cor: DIR_OUTROS, v: o }); return out.filter((x) => x.v > 0); };
     const od = dirOrd('desp', 'ordem'), gval = (k, c) => c === 'ordem' ? -dirGOrd(k) : c === 'nome' ? dirGNome(k) : c === 'v' ? GT[k] || 0 : c === 'pf' ? (fat ? (GT[k] || 0) / fat : 0) : c === 'meta' ? metas()[k] || 0 : c === 'dif' ? (fat && metas()[k] ? (GT[k] || 0) / fat - metas()[k] / 100 : -9) : c === 'vA' ? GA[k] || 0 : (dirVar(GT[k] || 0, GA[k] || 0) ?? -9);
@@ -361,8 +372,8 @@ export function criarDiretoria(ctx){
       '<section class="panel dpan"><div class="ph"><h2>' + titR + ' · ' + P.labP + '</h2></div>' + dirRosca(itens(TA), titR + ' ' + (ano - 1)) + '</section></div>';
     const gr = C.top.map((k) => ({ nome: nomeE(k), cor: C.cor[k], key: um ? null : k, vals: mks.map((mk) => ent(mk)[k] || 0) }));
     if (C.outros.length) gr.push({ nome: 'Outros', cor: DIR_OUTROS, vals: mks.map((mk) => dirSum(C.outros.map((k) => ent(mk)[k] || 0))) });
-    h += '<section class="panel dpan"><div class="ph"><h2>' + (um ? 'Proporção das subcategorias de ' + dirGNome(um) : 'Proporção das despesas') + ' mês a mês</h2><span class="dsub">' + (ano - 1) + ' e ' + ano + ' · ' + (um ? 'as 7 maiores subcategorias' : 'os 7 maiores grupos') + ' e o resto em Outros' + (um ? '' : ' · clique num grupo para filtrar') + '</span></div>' +
-      dirPilha({ titulo: 'Proporção das despesas', pct: true, w: 1600, h: 330, cats, grupos: gr, sep: [[0, 11, String(ano - 1)], [12, 23, String(ano)]],
+    h += '<section class="panel dpan"><div class="ph"><h2>' + (um ? 'Proporção das subcategorias de ' + dirGNome(um) : 'Proporção das despesas') + ' mês a mês</h2><span class="dsub">' + (ano - 1) + ' e ' + ano + (filtra ? ' · só os meses do filtro' : '') + ' · ' + (um ? 'as 7 maiores subcategorias' : 'os 7 maiores grupos') + ' e o resto em Outros' + (um ? '' : ' · clique num grupo para filtrar') + '</span></div>' +
+      dirPilha({ titulo: 'Proporção das despesas', pct: true, w: 1600, h: 330, cats, grupos: gr, sep,
         tips: (i) => { const t = dirSum(gr.map((g) => g.vals[i])); if (!t) return '<b>' + dirMk(mks[i]) + '</b><div>Sem lançamentos.</div>'; return '<b>' + dirMk(mks[i]) + '</b>' + gr.slice().reverse().map((g) => dirTipRow(g.cor, g.nome, dirP(g.vals[i] / (t || 1)) + ' · ' + dirR(g.vals[i]))).join('') + dirTipRow('', 'Total', dirR(t), true); } }) + '</section>';
     // tabela grupo › subcategoria
     h += '<section class="panel dpan"><div class="ph"><h2>Despesas por grupo · ' + P.lab + '</h2><span class="dsub">Clique no nome para filtrar por esse grupo, na seta para abrir as subcategorias e no título da coluna para ordenar.</span></div>' +
@@ -436,15 +447,14 @@ export function criarDiretoria(ctx){
       dirKpi('3 maiores clientes', tv ? dirP(top3 / tv) : '—', rank.slice(0, 3).map((k) => esc(nome(k).replace(' (inclui Seda)', ''))).join(', ')) +
       dirKpi('Ticket médio', tv ? 'R$ ' + num(tv / (dirSum(R.map((r) => r.qtd)) || 1)) : '—', 'faturado ÷ peças no período', 'g') + '</div>';
     // proporção mês a mês, os dois anos
-    const mks = [], cats = []; [ano - 1, ano].forEach((a) => MES3.forEach((m, i) => { const k = a + '-' + pad(i + 1); mks.push(k); cats.push(cap(m)); }));
-    const tot2 = {}; rows.filter((r) => mks.includes(r.data.slice(0, 7))).forEach((r) => { tot2[r.k] = (tot2[r.k] || 0) + r.valor; });
+    const { mks, cats, m24, sep, filtra } = dirMesesGraf(ano);
+    const tot2 = {}; rows.filter((r) => m24.includes(r.data.slice(0, 7))).forEach((r) => { tot2[r.k] = (tot2[r.k] || 0) + r.valor; });
     const C = dirTopN(tot2, 8);
     const porM = {}; rows.forEach((r) => { const mk = r.data.slice(0, 7); const o = porM[mk] = porM[mk] || {}; o[r.k] = (o[r.k] || 0) + r.valor; });
     const gr = C.top.map((k) => ({ nome: nome(k).replace(' (inclui Seda)', ''), cor: C.cor[k], vals: mks.map((mk) => (porM[mk] || {})[k] || 0) }));
     if (C.outros.length) gr.push({ nome: 'Outros', cor: DIR_OUTROS, vals: mks.map((mk) => dirSum(C.outros.map((k) => (porM[mk] || {})[k] || 0))) });
-    const i0 = mks.filter((mk) => mk.startsWith(String(ano - 1))).length;
-    h += '<section class="panel dpan"><div class="ph"><h2>Proporção do faturamento por cliente</h2><span class="dsub">' + (ano - 1) + ' e ' + ano + ' · os 7 maiores clientes e o resto em Outros</span></div>' +
-      dirPilha({ titulo: 'Proporção do faturamento por cliente', pct: true, w: 1600, h: 330, cats, grupos: gr, sep: [[0, i0 - 1, String(ano - 1)], [i0, mks.length - 1, String(ano)]].filter((x) => x[1] >= x[0]),
+    h += '<section class="panel dpan"><div class="ph"><h2>Proporção do faturamento por cliente</h2><span class="dsub">' + (ano - 1) + ' e ' + ano + (filtra ? ' · só os meses do filtro' : '') + ' · os 7 maiores clientes e o resto em Outros</span></div>' +
+      dirPilha({ titulo: 'Proporção do faturamento por cliente', pct: true, w: 1600, h: 330, cats, grupos: gr, sep,
         tips: (i) => { const t = dirSum(gr.map((g) => g.vals[i])); if (!t) return '<b>' + dirMk(mks[i]) + '</b><div>Sem faturamento.</div>'; return '<b>' + dirMk(mks[i]) + '</b>' + gr.slice().reverse().filter((g) => g.vals[i]).map((g) => dirTipRow(g.cor, g.nome, dirP(g.vals[i] / (t || 1)) + ' · ' + dirR(g.vals[i]))).join('') + dirTipRow('', 'Faturado no mês', dirR(t), true); } }) + '</section>';
     const tabela = (L, lab) => {
       const G = agg(L, (r) => r.k), T = { valor: dirSum(L.map((r) => r.valor)), qtd: dirSum(L.map((r) => r.qtd)), os: new Set(L.map((r) => r.os).filter(Boolean)).size };
