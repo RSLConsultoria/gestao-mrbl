@@ -2672,6 +2672,8 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   function closeCal(){ cal = null; document.getElementById('calHost').innerHTML = ''; }
   function drawCal(){
     if (!cal) return;
+    // a tela foi redesenhada (ex.: a data foi apagada): segue o mesmo campo pelo id; se ele sumiu, fecha
+    if (!document.body.contains(cal.anchor)) { const n = cal.anchor.id && document.getElementById(cal.anchor.id); if (n && !n.disabled) cal.anchor = n; else { closeCal(); return; } }
     const first = new Date(cal.y, cal.m, 1), off = (first.getDay() + 6) % 7, nd = new Date(cal.y, cal.m + 1, 0).getDate();
     let g = ['S','T','Q','Q','S','S','D'].map((x) => '<span class="wd">' + x + '</span>').join('');
     for (let i = 0; i < off; i++) g += '<span></span>';
@@ -2706,6 +2708,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (t && !t.disabled) { e.preventDefault(); t.focus({ preventScroll: true }); openCal(t, { commit: t.matches(COMMIT_DATE) }); return; }
     if (cal) closeCal();
   }, true);
+  // só o calendário do sistema: o do navegador não abre (clique, Alt+↓ ou espaço)
+  document.addEventListener('click', (e) => { if (e.target.matches && e.target.matches('input[type=date]')) e.preventDefault(); }, true);
+  document.addEventListener('keydown', (e) => { const t = e.target; if (t.matches && t.matches('input[type=date]') && ((e.altKey && e.key === 'ArrowDown') || e.key === ' ' || e.key === 'F4')) { e.preventDefault(); if (!t.disabled) openCal(t, { commit: t.matches(COMMIT_DATE) }); } }, true);
   document.getElementById('calHost').addEventListener('click', (e) => {
     const b = e.target.closest('[data-cal]'); if (!b || !cal) return; e.stopPropagation();
     const v = b.dataset.cal;

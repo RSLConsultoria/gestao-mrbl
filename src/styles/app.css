@@ -493,3 +493,6 @@ tr.ritrow.rpg td{color:var(--muted)}
 /* edição da conta: opção Sem data definida ao lado da data */
 .kdw{display:flex;gap:14px;align-items:center;min-width:0}.kdw input[type=date]{flex:1;min-width:0}
 .ksd{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer}.ksd input{width:16px;height:16px;margin:0;accent-color:var(--navy)}
+
+/* só o calendário do sistema: esconde o ícone do calendário do navegador */
+input[type=date]::-webkit-calendar-picker-indicator{display:none}
