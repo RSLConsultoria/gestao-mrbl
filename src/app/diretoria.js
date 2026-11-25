@@ -176,19 +176,24 @@ export function criarDiretoria(ctx){
     return { passo: p, topo: Math.ceil(max / p) * p || p, base: Math.floor(Math.min(0, min || 0) / p) * p };
   }
   // barras agrupadas por categoria (ex.: mês), com marca de meta opcional
+  let dirHachN = 0;
   function dirBarras(o){
     const W = o.w || 1000, H = o.h || 280, L = 58, R = 12, T = 22, B = 30, iw = W - L - R, ih = H - T - B, n = o.cats.length, ns = o.series.length;
     const vals = o.series.flatMap((s) => s.vals.filter((v) => v != null)).concat(o.metaV ? [o.metaV] : []).concat(o.linha ? o.linha.vals.filter((v) => v != null) : []);
     const E = dirEixo(Math.max(1, ...vals), Math.min(0, ...vals)), y = (v) => T + ih - (ih * (v - E.base)) / (E.topo - E.base);
     const cw = iw / n, gap = Math.min(10, cw * 0.18), bw = Math.max(3, (cw - gap * 2 - (ns - 1) * 2) / ns);
     let s = '<div class="fchart dchart"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.titulo || '') + '">';
+    // hachura do mês em andamento (ainda não consolidado): listras diagonais na cor da série sobre o fundo claro
+    const hid = 'dh' + (++dirHachN);
+    s += '<defs>' + o.series.map((se, j) => typeof se.cor === 'string' ? '<pattern id="' + hid + '-' + j + '" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)"><rect width="7" height="7" fill="#fff"/><rect width="3.5" height="7" fill="' + se.cor + '"/></pattern>' : '').join('') + '</defs>';
     for (let v = E.base; v <= E.topo + 1e-6; v += E.passo) s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '" class="gl' + (Math.abs(v) < 1e-9 ? ' z' : '') + '"/><text x="' + (L - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end" class="ax">' + (o.ax || dirAx)(v) + '</text>';
     o.cats.forEach((c, i) => {
       const x0 = L + cw * i + gap, fade = o.fade && o.fade(i);
       s += '<g' + (fade ? ' class="dfade"' : '') + '>';
       o.series.forEach((se, j) => {
         const v = se.vals[i]; if (v == null) return; const yy = y(Math.max(0, v)), h = Math.abs(y(v) - y(0)), x = x0 + j * (bw + 2);
-        s += '<path d="' + dirBarPath(x, v >= 0 ? yy : y(0), bw, Math.max(h, 0.5), v >= 0) + '" fill="' + (typeof se.cor === 'function' ? se.cor(v, i) : se.cor) + '"/>';
+        const parc = se.parcial && se.parcial(i) && typeof se.cor === 'string';
+        s += '<path d="' + dirBarPath(x, v >= 0 ? yy : y(0), bw, Math.max(h, 0.5), v >= 0) + '" fill="' + (parc ? 'url(#' + hid + '-' + j + ')' : typeof se.cor === 'function' ? se.cor(v, i) : se.cor) + '"' + (parc ? ' stroke="' + se.cor + '" stroke-width="1.5"' : '') + '/>';
         if (se.rot && v && !fade) s += '<text x="' + (x + bw / 2) + '" y="' + (v >= 0 ? yy - 5 : y(v) + 13) + '" text-anchor="middle" class="dl sm">' + se.rot(v) + '</text>';
       });
       s += '</g><text x="' + (L + cw * i + cw / 2) + '" y="' + (H - 10) + '" text-anchor="middle" class="ax">' + esc(c) + '</text>';
@@ -198,7 +203,7 @@ export function criarDiretoria(ctx){
     if (o.linha) { const pts = o.linha.vals.map((v, i) => v == null ? null : [L + cw * i + cw / 2, y(v)]).filter(Boolean);
       s += '<polyline fill="none" stroke="' + o.linha.cor + '" stroke-width="2" stroke-linejoin="round" points="' + pts.map((p) => p.join(',')).join(' ') + '"/>' + pts.map((p) => '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="4" fill="' + o.linha.cor + '" stroke="#fff" stroke-width="2"/>').join(''); }
     s += '</svg><div class="ftip dtip" hidden></div></div>';
-    s += '<div class="flegend">' + o.series.filter((se) => se.nome).map((se) => '<span><i style="background:' + (typeof se.cor === 'function' ? se.corL : se.cor) + '"></i>' + esc(se.nome) + '</span>').join('') + (o.metaV ? '<span><i class="lmeta"></i>Meta de ' + dirR(o.metaV) + ' por mês</span>' : '') + (o.linha ? '<span><i style="background:' + o.linha.cor + '"></i>' + esc(o.linha.nome) + '</span>' : '') + (o.leg || '') + '</div>';
+    s += '<div class="flegend">' + o.series.filter((se) => se.nome).map((se) => '<span><i style="background:' + (typeof se.cor === 'function' ? se.corL : se.cor) + '"></i>' + esc(se.nome) + '</span>').join('') + (o.series.some((se) => se.parcial && o.cats.some((_, i) => se.parcial(i) && se.vals[i] != null)) ? '<span><i class="lparc" style="--c:' + o.series.find((se) => se.parcial).cor + '"></i>Mês em andamento (parcial)</span>' : '') + (o.metaV ? '<span><i class="lmeta"></i>Meta de ' + dirR(o.metaV) + ' por mês</span>' : '') + (o.linha ? '<span><i style="background:' + o.linha.cor + '"></i>' + esc(o.linha.nome) + '</span>' : '') + (o.leg || '') + '</div>';
     return s;
   }
   // barra com 4px de raio só na ponta de dados (a base fica reta, presa na linha do zero)
@@ -316,16 +321,19 @@ export function criarDiretoria(ctx){
       dirKpi('Média mensal', dirN(q / nMed(P.ms)), qA ? (ano - 1) + ': ' + dirN(qA / nMed(P.prev)) : '&nbsp;') +
       dirKpi('Ticket médio', 'R$ ' + num(tk), 'faturado ÷ peças', 'g') +
       dirKpi('Variação do ticket', dirDelta(dirVar(tk, tkA)), tkA ? (ano - 1) + ': R$ ' + num(tkA) : '&nbsp;', 'g');
-    const mk = (a, i) => a + '-' + pad(i + 1), fade = (i) => !P.sel.has(i + 1);
+    const mk = (a, i) => a + '-' + pad(i + 1), filtra = dirV().tris.length || dirV().meses.length;
+    // mês em andamento: aparece mesmo sem estar no período (que só soma meses fechados), hachurado por não estar consolidado
+    const emAnd = (i) => mk(ano, i) === CUR, fade = (i) => !P.sel.has(i + 1) && !(emAnd(i) && !filtra);
+    const parcTip = (i) => emAnd(i) ? '<small class="dtparc">Mês em andamento: valor parcial, ainda não consolidado.</small>' : '';
     const vA = MES3.map((_, i) => (FM[mk(ano - 1, i)] || {}).valor || null), vC = MES3.map((_, i) => mk(ano, i) <= CUR ? ((FM[mk(ano, i)] || {}).valor || null) : null);
     const qAv = MES3.map((_, i) => (FM[mk(ano - 1, i)] || {}).qtd || null), qCv = MES3.map((_, i) => mk(ano, i) <= CUR ? ((FM[mk(ano, i)] || {}).qtd || null) : null);
     const metaV = dirMeta();
     const gF = '<section class="panel dpan"><div class="ph"><h2>Faturamento por mês</h2><span class="dsub">' + ano + ' contra ' + (ano - 1) + (metaV ? ' · tracejado = meta de ' + dirR(metaV) + ' por mês' : '') + '</span></div>' +
-      dirBarras({ titulo: 'Faturamento por mês', w: 760, h: 300, cats: MES3.map(cap), series: [{ nome: String(ano - 1), cor: DIR_ANT, vals: vA }, { nome: String(ano), cor: DIR_ATU, vals: vC, rot: (v) => v >= 1e6 ? (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : dirAx(v) }], metaV, fade,
-        tips: (i) => '<b>' + cap(MESES[i]) + '</b>' + dirTipRow(DIR_ATU, String(ano), vC[i] != null ? dirR(vC[i]) : '—') + dirTipRow(DIR_ANT, String(ano - 1), vA[i] != null ? dirR(vA[i]) : '—') + (metaV ? dirTipRow('', 'Meta', dirR(metaV)) + (vC[i] ? dirTipRow('', 'Atingido', dirP(vC[i] / metaV, 0), true) : '') : '') }) + '</section>';
+      dirBarras({ titulo: 'Faturamento por mês', w: 760, h: 300, cats: MES3.map(cap), series: [{ nome: String(ano - 1), cor: DIR_ANT, vals: vA }, { nome: String(ano), cor: DIR_ATU, vals: vC, parcial: emAnd, rot: (v) => v >= 1e6 ? (v / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : dirAx(v) }], metaV, fade,
+        tips: (i) => '<b>' + cap(MESES[i]) + '</b>' + dirTipRow(DIR_ATU, String(ano), vC[i] != null ? dirR(vC[i]) : '—') + dirTipRow(DIR_ANT, String(ano - 1), vA[i] != null ? dirR(vA[i]) : '—') + (metaV ? dirTipRow('', 'Meta', dirR(metaV)) + (vC[i] ? dirTipRow('', 'Atingido', dirP(vC[i] / metaV, 0), true) : '') : '') + parcTip(i) }) + '</section>';
     const gP = '<section class="panel dpan"><div class="ph"><h2>Peças faturadas por mês</h2><span class="dsub">' + ano + ' contra ' + (ano - 1) + '</span></div>' +
-      dirBarras({ titulo: 'Peças por mês', w: 760, h: 300, cats: MES3.map(cap), series: [{ nome: String(ano - 1), cor: '#F2DC9B', vals: qAv }, { nome: String(ano), cor: '#B98A00', vals: qCv, rot: (v) => (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }], fade, ax: (v) => dirNk(v),
-        tips: (i) => '<b>' + cap(MESES[i]) + '</b>' + dirTipRow('#B98A00', String(ano), qCv[i] != null ? dirN(qCv[i]) + ' peças' : '—') + dirTipRow('#F2DC9B', String(ano - 1), qAv[i] != null ? dirN(qAv[i]) + ' peças' : '—') + (qCv[i] && vC[i] ? dirTipRow('', 'Ticket', 'R$ ' + num(vC[i] / qCv[i]), true) : '') }) + '</section>';
+      dirBarras({ titulo: 'Peças por mês', w: 760, h: 300, cats: MES3.map(cap), series: [{ nome: String(ano - 1), cor: '#F2DC9B', vals: qAv }, { nome: String(ano), cor: '#B98A00', vals: qCv, parcial: emAnd, rot: (v) => (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }], fade, ax: (v) => dirNk(v),
+        tips: (i) => '<b>' + cap(MESES[i]) + '</b>' + dirTipRow('#B98A00', String(ano), qCv[i] != null ? dirN(qCv[i]) + ' peças' : '—') + dirTipRow('#F2DC9B', String(ano - 1), qAv[i] != null ? dirN(qAv[i]) + ' peças' : '—') + (qCv[i] && vC[i] ? dirTipRow('', 'Ticket', 'R$ ' + num(vC[i] / qCv[i]), true) : '') + parcTip(i) }) + '</section>';
     h += '<div class="drow2"><section class="panel dblk dres rc"><h3>Faturamento</h3><div class="dbn3">' + kF + '</div></section>' +
       '<section class="panel dblk dres rs"><h3>Produção</h3><div class="dbn3">' + kP + '</div></section></div>';
     h += '<div class="drow2">' + gF + gP + '</div>';
