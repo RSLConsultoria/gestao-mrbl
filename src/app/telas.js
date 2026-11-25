@@ -3,6 +3,7 @@
 /* eslint-disable */
 import { lerFluxoConsolidado } from './historico.js';
 import { criarDiretoria, DIR_TELAS, DIR_TITULO } from './diretoria.js';
+import { AC_MODS, AC_TELAS, acModNome, acessoPadrao, acessoValido, modsDe, telasDe, comCfg } from './acessos.js';
 const LISTAS = {"DESPESAS COM FUNCIONARIOS": ["SALARIOS", "SALARIOS PJ", "PLANO DE SAUDE", "CONVENIOS FARMACIA / LOJA", "PREMIO", "REEMBOLSO", "RESCISÃO", "ACORDO TRABALHISTA", "UNIFORME/SAPATOS/EPI", "FERIAS", "VALE ALIMETAÇÃO/ VALE REFEIÇÃO", "SEGURO DE VIDA", "PENSÃO", "EMPRESTIMOS", "HORAS EXTRAS", "VALE TRANSPORTE", "CURSOS/ TREINAMENTOS", "OUTRAS DIVERSAS RH (ALIMENTAÇÃO)", "ATESTADO MEDICO ADMIS / DEMISSIONAL /EXAME MEDICO", "13 SALARIO"], "ENCARGOS SOCIAIS": ["INSS / GPS", "IRRF", "IRRF ( PARCELAMENTO)", "DARF", "GRRF", "SINDICATO / ISS", "FGTS (PARCELAMENTO)", "FGTS"], "DESPESAS COM UTILITARIOS E SERVIÇOS": ["AGUA E ESGOTO", "ENERGIA ELETRICA", "TELEFONE FIXO", "TELEFONE CELULAR", "INTERNET", "OUTROS / DIVERSOS"], "DESPESAS TRIBUTARIAS FEDERAIS": ["PIS", "COFINS", "IRPJ", "CSSLL", "DAS", "IPI", "DAE", "ICMS", "PARCELAMENTO ICMS"], "DESPESAS TRIBUTARIAS MUNICIPAIS": ["IPTU (OUTRAS TAXAS EM GERAL)"], "DESPESAS COM VENDAS E MKT": ["PATROCINIO", "PROPAGANDA/MARKETING", "VEICULOS DE COMUNICAÇÃO", "BONIFICAÇÃO PARA PARCEIROS", "CONSULTAS DE CREDITO (SERASA)", "COMISSOES/GRATIFICAÇÕES", "ASSOCIAÇÕES E SINDICATOS", "OUTRAS"], "DESPESAS ADMINISTRATIVA": ["MATERIAL DE ESCRITORIO", "CARTÃO DE CREDITO", "CORREIO", "MOTOTAXI / ENTREGAS RAPIDAS", "CONSULTORIA/ADVOGADOS", "CONTABILIDADE", "CAIXA INTERNO", "COMPRA EQUIPAMENTOS / MOVÉIS E UTENSÍLIOS", "MANUTENÇÃO DE MÁQUINAS", "MATERIAL USO CONSUMO", "MATERIAL DE EMBALAGENS", "INFORMATICA/SISTEMA", "RECRUTAMENTO ( PUPLICAÇÃO VAGA EMPREGO)", "DESPESA DE VIAGEM / HOSPEDAGEM / CONDOMINIO", "SEM PARAR", "SEGURO EMPRESA", "TAXAS DIVERSAS (CARTORIO)", "ALARME MONITORADO/SEGURANÇA", "LIMPEZA EM GERAL", "TAXAS DIVERSAS"], "ACESSORIAS": ["ACESSORIAS EM GERAL (OF)", "ACESSORIAS EM GERAL (OF) SN", "TERCEIRIZADOS (PJ)", "PASSIVOS DIVERSOS (CO/ST)"], "MANUTENCAO PREDIAL": ["MATERIAIS P/ CONSTRUÇÃO E FERRAMENTAS", "COLETA DE RESIDUOS", "ELEVADOR"], "PREJUIZOS": ["USO E CONSUMO", "PERDAS EM GERAL"], "DESPESAS FINANCEIRAS": ["CAPITALIZAÇÃO E SEGUROS", "TARIFA DIVERSAS + JUROS", "AMORTIZAÇÃO CONTA GARANTIA", "DEVOLUÇÕES DUPLICIDADE TÍTULOS", "ESTORNO", "TAXA DE ANTECIPAÇÃO DE RECEBIVEIS", "PROFINANCE ( EMPRESTIMO)", "TRANSFERENCIA"], "FINANCIAMENTOS": ["FINANCIAMENTO BNDES / PRONAMPE", "CONSÓRCIO / EMPRÉSTIMOS", "VEICULOS E OUTROS"], "PRÓ-LABORE": ["DIRETORIA", "INVESTIMENTOS PESSOAIS"], "AQUISIÇÕES / INVESTIMENTOS": ["COMPRA DE MAQUINAS", "ANIMALE ( EMPRESTIMO SEDA )", "CONSTRUÇÃO EM ANDAMENTO"], "MANUTENÇAO VEICULAR": ["TRIBUTOS (IPVA / LICENCIAMENTO / OUTROS / MULTAS )", "SEGURO CARRO", "COMBUSTÍVEL", "MANUTENÇÃO / PEÇAS DE VEÍCULOS"], "PROVISAO": ["FESTA FINAL DE ANO", "13º SALARIO", "FÉRIAS"], "ALUGUEL": ["ALUGUEL"], "FORNECEDORES (CMV)": ["FORNECEDORES"], "FRETE": ["FRETE"]};
 const EMPS = ["MRBL", "STOFFA"];
 const ECATS = ["RECEBIMENTO DE CLIENTE", "DEVOLUÇÃO", "RECEBIMENTO MRBL", "RECEBIMENTO STOFFA", "EMPRÉSTIMO PROFINANCE", "ANTECIPAÇÃO"];
@@ -48,6 +49,8 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     // metas da Diretoria (Configurações › Diretoria); null = padrão do Power BI
     dirMetas: CFG.dirMetas && typeof CFG.dirMetas === 'object' ? CFG.dirMetas : null, dirMetaFat: CFG.dirMetaFat == null || CFG.dirMetaFat === '' ? null : +CFG.dirMetaFat
   };
+  // níveis de acesso (Configurações › Acessos); antes de salvos, administradores com tudo e os demais com Financeiro
+  S.acesso = acessoValido(CFG.acesso) ? CFG.acesso : acessoPadrao(S.usuarios, (Array.isArray(CFG.admins) && CFG.admins.length ? CFG.admins : ['Lucca']).concat(dados.admin ? [dados.usuario] : []));
   S.previsoes.forEach((p) => { if (!Array.isArray(p.subs)) p.subs = p.subs ? String(p.subs).split(';').map((x) => x.trim()).filter(Boolean) : []; });
   S.contas.forEach((c) => { if (!c.hist) c.hist = c.orig && c.orig !== c.data ? [{ de: c.orig, para: c.data, em: null }] : []; });
   const OFSUBS = [OF, OFSN];
@@ -942,7 +945,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     else window.scrollTo(0, y0);
   }
   function renderCore(){
+    acAplica();
     document.querySelectorAll('[data-tela]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tela === view.tela)));
+    navGrupos();
     document.getElementById('btnNew').textContent = view.tela === 'of' ? '+ Nova entrega' : view.tela === 'parc' ? '+ Novo parcelamento' : '+ Nova conta';
     { const gs = document.getElementById('gSearch'); if (gs) gs.placeholder = view.tela === 'of' ? 'Buscar oficina' : 'Buscar fornecedor ou categoria'; }
     { const ub = document.getElementById('userBox'); if (ub) ub.innerHTML = 'Conectado como<span class="ub-name">' + esc(S.user) + '</span><button type="button" class="ub-out" id="btnSair">Sair</button>'; }
@@ -1125,10 +1130,14 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   // ---------- configurações ----------
   function renderCfg(){
     const app = document.getElementById('app');
-    const tab = view.cfgTab || 'listas';
+    // abas por módulo: Minha conta para todos; Listas e Previsões com Financeiro; Diretoria com Diretoria; Acessos e Usuários só administrador
+    const m = modsDe(S.acesso, S.user), adm = m.includes('cfg');
+    const abas = [['conta', 'Minha conta', true], ['listas', 'Listas de fornecedores', adm || m.includes('fin')], ['prev', 'Previsões', adm || m.includes('fin')], ['ac', 'Acessos', adm], ['dir', 'Diretoria', adm || m.includes('dir')], ['logs', 'Usuários e logs', adm]].filter((x) => x[2]);
+    if (!abas.some((x) => x[0] === view.cfgTab)) view.cfgTab = abas.some((x) => x[0] === 'listas') ? 'listas' : abas[0][0];
+    const tab = view.cfgTab;
     let h = '<div class="today"><h1>Configurações</h1></div>';
-    h += '<div class="seg" role="tablist" aria-label="Seções"><button type="button" role="tab" data-cfgtab="listas" aria-selected="' + (tab === 'listas') + '">Listas de fornecedores</button><button type="button" role="tab" data-cfgtab="prev" aria-selected="' + (tab === 'prev') + '">Previsões' + (reviewPending() ? ' <i class="dotp" title="Revisão pendente"></i>' : '') + '</button><button type="button" role="tab" data-cfgtab="dir" aria-selected="' + (tab === 'dir') + '">Diretoria</button><button type="button" role="tab" data-cfgtab="logs" aria-selected="' + (tab === 'logs') + '">Usuários e logs</button></div>';
-    h += tab === 'prev' ? cfgPrev() : tab === 'logs' ? cfgLogs() : tab === 'dir' ? DIR.cfg() : cfgListas();
+    h += '<div class="seg" role="tablist" aria-label="Seções">' + abas.map(([k, n]) => '<button type="button" role="tab" data-cfgtab="' + k + '" aria-selected="' + (tab === k) + '">' + n + (k === 'prev' && reviewPending() ? ' <i class="dotp" title="Revisão pendente"></i>' : '') + '</button>').join('') + '</div>';
+    h += tab === 'prev' ? cfgPrev() : tab === 'logs' ? cfgLogs() : tab === 'conta' ? cfgConta() : tab === 'ac' ? cfgAcessos() : tab === 'dir' ? DIR.cfg() : cfgListas();
     app.innerHTML = h;
   }
   function cfgListas(){
@@ -2913,6 +2922,111 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const fallback = () => { const o = document.getElementById('copyOut'); o.innerHTML = '<textarea class="copybox" readonly aria-label="Tabela para copiar">' + esc(txt) + '</textarea>'; const ta = o.querySelector('textarea'); ta.focus(); ta.select(); toast('Copie com Ctrl+C a tabela que apareceu no rodapé.', false); };
     try { navigator.clipboard.writeText(txt).then(() => toast(rows.length + ' linhas copiadas. Cole no Excel com Ctrl+V.', false), fallback); } catch (err) { fallback(); }
   }
+  // =====================================================================
+  // NÍVEIS DE ACESSO (perfis por módulo, ajuste por usuário) e MENU LATERAL
+  // =====================================================================
+  const acPerfil = (id) => (S.acesso.perfis || []).find((p) => p.id === id);
+  const acAdmin = () => modsDe(S.acesso, S.user).includes('cfg');
+  function acAplica(){
+    const ok = telasDe(S.acesso, S.user), mods = modsDe(S.acesso, S.user), GRP = { dir: 'dir', fin: 'fin' };
+    document.querySelectorAll('.tabs [data-tela]').forEach((b) => { const g = b.closest('.navgrp'), mk = g && GRP[g.dataset.grp]; b.hidden = !ok.includes(b.dataset.tela) || (mk ? !mods.includes(mk) : false); });
+    document.querySelectorAll('.tabs .navgrp').forEach((g) => { g.hidden = !g.querySelector('[data-tela]:not([hidden])'); });
+    if (!ok.includes(view.tela)) { view.tela = ok[0]; view.modal = null; }
+  }
+  function cfgConta(){
+    const a = S.acesso.usuarios[S.user] || {}, p = acPerfil(a.perfil), m = modsDe(S.acesso, S.user).filter((k) => k !== 'cfg');
+    return '<section class="panel accnt"><div class="lhead"><div><h2>Minha conta</h2><small>Quem está usando o sistema neste navegador.</small></div></div><div class="accnt-b">' +
+      '<div class="cpinfo"><div><span>Conectado como</span><b>' + esc(S.user) + '</b></div><div><span>Perfil</span><b>' + esc(p ? p.nome : 'Sem perfil') + (Array.isArray(a.mods) ? ' · personalizado' : '') + '</b></div><div><span>Módulos liberados</span><b>' + (m.length ? m.map(acModNome).join(', ') : 'Nenhum ainda') + '</b></div></div>' +
+      (m.length ? '' : '<div class="cpalert warn"><b>Seu usuário ainda não tem acesso a nenhum módulo.</b><span>Peça para quem administra o sistema liberar em Configurações › Acessos.</span></div>') +
+      '<button type="button" class="btn" id="btnSair"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Sair do sistema</button></div></section>';
+  }
+  function cfgAcessos(){
+    const A = S.acesso, us = S.usuarios || [];
+    const ck = (on, attr, tit) => '<input type="checkbox" ' + attr + (on ? ' checked' : '') + (tit ? ' title="' + esc(tit) + '"' : '') + '>';
+    let h = '<div class="acgrid"><section class="panel lpane"><div class="lhead"><div><h2>Perfis</h2><small>Cada perfil libera módulos inteiros. Relatório de despesas aparece para quem tem Diretoria ou Financeiro.</small></div></div>' +
+      '<table class="ltab actab"><thead><tr><th>Perfil</th>' + AC_MODS.map(([, n]) => '<th class="c">' + n + '</th>').join('') + '<th class="c">Usuários</th><th></th></tr></thead><tbody>' +
+      A.perfis.map((p) => { const n = us.filter((u) => A.usuarios[u] && A.usuarios[u].perfil === p.id).length;
+        return '<tr><td><b>' + esc(p.nome) + '</b></td>' + AC_MODS.map(([k]) => '<td class="c">' + ck(p.mods.includes(k), 'data-acpm="' + p.id + ':' + k + '" aria-label="' + esc(p.nome) + ': ' + esc(acModNome(k)) + '"', acModNome(k)) + '</td>').join('') + '<td class="c num">' + n + '</td><td class="r">' + (n || p.id === 'adm' ? '' : '<button type="button" class="icon" data-acpdel="' + p.id + '" aria-label="Excluir o perfil ' + esc(p.nome) + '" title="Excluir perfil"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>') + '</td></tr>'; }).join('') +
+      '<tr class="ladd"><td colspan="' + (AC_MODS.length + 2) + '"><input id="acNovoPerfil" placeholder="Novo perfil (ex.: Diretoria)" autocomplete="off" aria-label="Nome do novo perfil"></td><td class="r"><button type="button" class="btn sm y" data-acpadd="1">Adicionar</button></td></tr></tbody></table></section>';
+    h += '<section class="panel lpane"><div class="lhead"><div><h2>Usuários</h2><small>Escolha o perfil de cada pessoa. Para liberar ou tirar um módulo só dela, marque direto na linha: ela fica personalizada.</small></div></div>' +
+      '<table class="ltab actab"><thead><tr><th>Usuário</th><th>Perfil</th>' + AC_MODS.map(([, n]) => '<th class="c">' + n + '</th>').join('') + '<th></th></tr></thead><tbody>' +
+      us.map((u) => { const a = A.usuarios[u] || { perfil: '', mods: null }, m = modsDe(A, u), pers = Array.isArray(a.mods);
+        return '<tr><td><b>' + esc(u) + '</b>' + (u === S.user ? ' <span class="chip c-open" style="margin-left:6px">você</span>' : '') + (pers ? '<span class="acpers">personalizado · <button type="button" class="lnk" data-acureset="' + esc(u) + '">voltar ao perfil</button></span>' : '') + '</td>' +
+          '<td><select class="acsel" data-acup="' + esc(u) + '" aria-label="Perfil de ' + esc(u) + '"><option value="">Sem perfil</option>' + A.perfis.map((p) => '<option value="' + p.id + '"' + (p.id === a.perfil ? ' selected' : '') + '>' + esc(p.nome) + '</option>').join('') + '</select></td>' +
+          AC_MODS.map(([k]) => '<td class="c">' + ck(m.includes(k), 'data-acum="' + esc(u) + ':' + k + '" aria-label="' + esc(u) + ': ' + esc(acModNome(k)) + '"', acModNome(k)) + '</td>').join('') +
+          '<td class="r">' + (m.length ? '' : '<span class="chip c-late">sem acesso</span>') + '</td></tr>'; }).join('') + '</tbody></table>' +
+      '<p class="cphint" style="padding:10px 14px;margin:0">Novos usuários entram em Usuários e logs e começam sem perfil. Quem tem Configurações é administrador: mexe em acessos, usuários e importações. Sempre fica pelo menos uma pessoa com Configurações, para ninguém trancar o sistema.</p></section></div>';
+    return h;
+  }
+  function acMudaUsuario(u, novo, msg){
+    const antes = S.acesso.usuarios[u];
+    S.acesso.usuarios[u] = novo; const ok = comCfg(S.acesso, S.usuarios); S.acesso.usuarios[u] = antes;
+    if (!ok) { toast('Pelo menos um usuário precisa continuar com acesso a Configurações.', false); render(); return; }
+    act(msg, () => { S.acesso.usuarios[u] = novo; });
+  }
+  document.addEventListener('change', (e) => {
+    const t = e.target; if (!t.dataset || !S.acesso || view.tela !== 'cfg') return;
+    if (t.dataset.acpm) { const [id, k] = t.dataset.acpm.split(':'), p = acPerfil(id); if (!p) return;
+      const novos = t.checked ? p.mods.concat(k) : p.mods.filter((x) => x !== k);
+      const old = p.mods; p.mods = novos; const ok = comCfg(S.acesso, S.usuarios); p.mods = old;
+      if (!ok) { toast('Pelo menos um usuário precisa continuar com acesso a Configurações.', false); render(); return; }
+      act('Perfil ' + p.nome + (t.checked ? ' agora acessa ' : ' não acessa mais ') + acModNome(k) + '.', () => { const q = acPerfil(id); q.mods = AC_MODS.map((m) => m[0]).filter((x) => novos.includes(x)).concat(old.filter((x) => !AC_MODS.some((m) => m[0] === x))); }); return; }
+    if (t.dataset.acup) { const u = t.dataset.acup, p = acPerfil(t.value);
+      acMudaUsuario(u, { perfil: t.value, mods: null }, u + (p ? ' agora tem o perfil ' + p.nome : ' ficou sem perfil') + '.'); return; }
+    if (t.dataset.acum) { const [u, k] = t.dataset.acum.split(':'), a = S.acesso.usuarios[u] || { perfil: '', mods: null }, cur = modsDe(S.acesso, u);
+      const mods = AC_MODS.map((m) => m[0]).filter((x) => x === k ? t.checked : cur.includes(x));
+      const p = acPerfil(a.perfil), igual = p && p.mods.filter((x) => AC_MODS.some((m) => m[0] === x)).length === mods.length && mods.every((x) => p.mods.includes(x));
+      acMudaUsuario(u, { perfil: a.perfil, mods: igual ? null : mods }, u + (t.checked ? ' agora acessa ' : ' não acessa mais ') + acModNome(k) + (igual ? ' (igual ao perfil).' : ' (personalizado).')); return; }
+  });
+  document.addEventListener('click', (e) => {
+    const t = e.target; if (!t.closest || view.tela !== 'cfg') return;
+    const add = t.closest('[data-acpadd]'); if (add) { const n = (document.getElementById('acNovoPerfil').value || '').trim(); if (!n) return toast('Escreva o nome do perfil.', false);
+      if (S.acesso.perfis.some((p) => p.nome.toLowerCase() === n.toLowerCase())) return toast('Já existe um perfil ' + n + '.', false);
+      act('Perfil ' + n + ' criado.', () => { S.acesso.perfis.push({ id: 'p' + Date.now().toString(36), nome: n, mods: [] }); }); return; }
+    const del = t.closest('[data-acpdel]'); if (del) { const p = acPerfil(del.dataset.acpdel); if (p) act('Perfil ' + p.nome + ' excluído.', () => { S.acesso.perfis = S.acesso.perfis.filter((x) => x.id !== p.id); }); return; }
+    const rs = t.closest('[data-acureset]'); if (rs) { const u = rs.dataset.acureset, a = S.acesso.usuarios[u]; acMudaUsuario(u, { perfil: a.perfil, mods: null }, u + ' voltou a seguir o perfil.'); return; }
+  });
+
+  // ----- menu lateral em grupos (Diretoria / Financeiro) que expandem e recolhem -----
+  const NAV_KEY = 'mrbl-nav-grupos';
+  const navAberto = (() => { try { return JSON.parse(localStorage.getItem(NAV_KEY)) || {}; } catch (e) { return {}; } })();
+  function navGrupos(){
+    document.querySelectorAll('.navgrp').forEach((g) => {
+      const k = g.dataset.grp, tem = !!g.querySelector('[data-tela="' + view.tela + '"]');
+      const aberto = navAberto[k] !== undefined ? navAberto[k] : true;
+      const h = g.querySelector('.grph'), bd = g.querySelector('.grpb');
+      h.setAttribute('aria-expanded', String(aberto)); bd.hidden = !aberto;
+      h.classList.toggle('has-active', tem && !aberto);
+    });
+  }
+  // ----- menu recolhido: só os ícones; clicar no ícone abre a lista do grupo ao lado -----
+  const NAVC_KEY = 'mrbl-nav-curta';
+  let navCurta = false; try { navCurta = localStorage.getItem(NAVC_KEY) === '1'; } catch (e) {}
+  function navCurtaAplica(){
+    document.body.classList.toggle('navcurta', navCurta);
+    const b = document.getElementById('navTog');
+    if (b) { b.setAttribute('aria-expanded', String(!navCurta)); b.setAttribute('aria-label', navCurta ? 'Expandir menu' : 'Recolher menu'); b.title = navCurta ? 'Expandir menu' : 'Recolher menu'; b.querySelector('span').textContent = navCurta ? 'Expandir' : 'Recolher menu'; }
+    document.querySelectorAll('.tabs .grph').forEach((h) => { h.title = navCurta ? h.querySelector('span').textContent : ''; });
+    const cfgB = document.querySelector('.tabs .navsolo'); if (cfgB) cfgB.title = navCurta ? 'Configurações' : '';
+    navFlyFecha();
+  }
+  function navFlyFecha(){ document.querySelectorAll('.navgrp.fly').forEach((g) => g.classList.remove('fly')); }
+  document.addEventListener('click', (e) => {
+    const t = e.target; if (!t.closest) return;
+    if (t.closest('#navTog')) { e.stopPropagation(); navCurta = !navCurta; try { localStorage.setItem(NAVC_KEY, navCurta ? '1' : '0'); } catch (err) {} navCurtaAplica(); return; }
+    const gt = t.closest('.tabs [data-grptog]');
+    if (gt && !navCurta) { e.stopPropagation(); const k = gt.dataset.grptog; navAberto[k] = gt.getAttribute('aria-expanded') !== 'true';
+      try { localStorage.setItem(NAV_KEY, JSON.stringify(navAberto)); } catch (err) {} navGrupos(); return; }
+    if (!navCurta) return;
+    if (gt) { e.stopPropagation(); const g = gt.closest('.navgrp'), ab = g.classList.contains('fly'); navFlyFecha();
+      if (!ab) { g.classList.add('fly'); const bd = g.querySelector('.grpb'), r = gt.getBoundingClientRect(); bd.style.top = '8px'; const hh = bd.offsetHeight; bd.style.top = Math.max(8, Math.min(r.top, window.innerHeight - hh - 8)) + 'px'; }
+      return; }
+    if (t.closest('.navgrp.fly [data-tela]')) { setTimeout(navFlyFecha, 0); return; }
+    if (!t.closest('.navgrp.fly')) navFlyFecha();
+  }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.navgrp.fly')) navFlyFecha(); });
+  navCurtaAplica();
+
   const DIR = criarDiretoria({ getS: () => S, view, render, act, toast, api, esc, money, num, pad, cap, MESES, MES3, mesNome, mAdd, CUR, agora, cellVal, normTxt,
     carregarExcel: () => loadJs(XLS), admin: ADMIN, fat: dados.fatHistorico || [], imp: CFG.dirFatImp,
     DRE_ANO: +DRE_MESES[0].slice(0, 4), dreData, histAno, parcInfo, chqSit, chqValor });

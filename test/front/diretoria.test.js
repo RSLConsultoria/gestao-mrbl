@@ -41,3 +41,13 @@ describe('Diretoria: metas vão para a Config', () => {
     expect(diferenca(f, S).mud.Config).toEqual({ dirMetas: { ALUGUEL: 2.5 }, dirMetaFat: 2000000 });
   });
 });
+
+describe('acessos vão para a Config', () => {
+  it('manda acessos só quando mudam', () => {
+    const S = { contas: [], prazoOf: 15, prevReview: {}, acesso: { perfis: [], usuarios: {} } };
+    const f = fotografar(S);
+    expect(diferenca(f, S).vazio).toBe(true);
+    S.acesso.usuarios.Lucca = { perfil: 'adm', mods: null };
+    expect(diferenca(f, S).mud.Config.acesso.usuarios.Lucca.perfil).toBe('adm');
+  });
+});

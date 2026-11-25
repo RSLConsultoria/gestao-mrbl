@@ -494,6 +494,9 @@ export function criarDiretoria(ctx){
       const linhas = []; ws.eachRow((row, n) => { linhas[n - 1] = (row.values || []).slice(1).map(cellVal); });
       const x = lerSemanal(linhas); r.rows.push(...x.rows); r.semData += x.semData; r.ign += x.ign;
     });
+    // data de faturamento fora do ano anterior e do atual é erro de digitação na planilha (ex.: 1934, 2023): fica de fora
+    const ok = (d) => { const a = +d.slice(0, 4); return a >= ANO - 1 && a <= ANO + 1; };
+    r.foraAno = r.rows.filter((x) => !ok(x.data)).map((x) => x.data); r.rows = r.rows.filter((x) => ok(x.data));
     return r;
   }
   function dirImpModal(){
@@ -501,7 +504,7 @@ export function criarDiretoria(ctx){
     const M = {}; I.rows.forEach((r) => { const m = M[r.data.slice(0, 7)] = M[r.data.slice(0, 7)] || { n: 0, qtd: 0, valor: 0 }; m.n++; m.qtd += r.qtd; m.valor += r.valor; });
     const antes = {}; FAT.forEach((r) => { const mk = String(r.data).slice(0, 7); antes[mk] = (antes[mk] || 0) + (+r.valor || 0); });
     return '<div class="modal-bg" data-modal-bg><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt" style="width:min(720px,96vw)"><div class="mh"><h2 id="mt">Importar faturamento · ' + esc(I.arquivo) + '</h2><button type="button" class="mx" data-modal-close aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="fbody">' +
-      '<p style="margin:0 0 10px;color:var(--muted)">Abas lidas: ' + esc(I.abas.join(', ')) + '. ' + I.rows.length + ' linhas faturadas' + (I.semData ? ', ' + I.semData + ' sem data de faturamento (ficam de fora)' : '') + (I.ign ? ', ' + I.ign + ' de previsão ou total ignoradas' : '') + '.</p>' +
+      '<p style="margin:0 0 10px;color:var(--muted)">Abas lidas: ' + esc(I.abas.join(', ')) + '. ' + I.rows.length + ' linhas faturadas' + (I.semData ? ', ' + I.semData + ' sem data de faturamento (ficam de fora)' : '') + (I.ign ? ', ' + I.ign + ' de previsão ou total ignoradas' : '') + (I.foraAno && I.foraAno.length ? ', ' + I.foraAno.length + ' com data fora de ' + (ANO - 1) + '–' + (ANO + 1) + ' (ficam de fora; confira na planilha: ' + esc([...new Set(I.foraAno)].sort().slice(0, 6).map((d) => d.split('-').reverse().join('/')).join(', ')) + ')' : '') + '.</p>' +
       '<div class="imp-tab"><table><thead><tr><th>Mês</th><th class="r">Linhas</th><th class="r">Peças</th><th class="r">Faturado no arquivo</th><th class="r">Importado antes</th></tr></thead><tbody>' +
       Object.keys(M).sort().map((mk) => '<tr><td>' + dirMk(mk) + '</td><td class="r num">' + M[mk].n + '</td><td class="r num">' + dirN(M[mk].qtd) + '</td><td class="r num">' + money(M[mk].valor) + '</td><td class="r num">' + (antes[mk] ? money(antes[mk]) : '—') + '</td></tr>').join('') +
       '</tbody></table></div>' +

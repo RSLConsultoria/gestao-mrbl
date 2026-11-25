@@ -33,3 +33,18 @@ describe('base de faturamento da Diretoria', () => {
     expect(chamar(g, 'dados.carregar', {}, viv).dados.config).toMatchObject({ dirMetas: { ALUGUEL: 3 }, dirMetaFat: 1900000 });
   });
 });
+
+describe('acessos', () => {
+  const acesso = (lucca, viv) => ({ perfis: [{ id: 'adm', nome: 'Administrador', mods: ['dir', 'fin', 'cfg'] }, { id: 'fin', nome: 'Financeiro', mods: ['fin'] }], usuarios: { Lucca: { perfil: lucca, mods: null }, Viviane: { perfil: viv, mods: null } } });
+  it('só administrador grava os acessos, e sempre sobra alguém com Configurações', () => {
+    const { g, luc, viv } = logado();
+    expect(chamar(g, 'sync.aplicar', { mud: { Config: { acesso: acesso('fin', 'adm') } } }, viv).ok).toBe(false);
+    expect(chamar(g, 'config.definir', { chave: 'acesso', valor: JSON.stringify(acesso('fin', 'adm')) }, viv).ok).toBe(false);
+    expect(chamar(g, 'sync.aplicar', { mud: { Config: { acesso: acesso('fin', 'fin') } } }, luc).ok).toBe(false);
+    expect(chamar(g, 'sync.aplicar', { mud: { Config: { acesso: acesso('fin', 'adm') } } }, luc).ok).toBe(true);
+    // agora a Viviane é a administradora e o Lucca não
+    expect(chamar(g, 'dados.carregar', {}, viv).dados.admin).toBe(true);
+    expect(chamar(g, 'dados.carregar', {}, luc).dados.admin).toBe(false);
+    expect(chamar(g, 'faturamento.importar', { linhas: [linha('2026-01-05', '1', 1)] }, luc).ok).toBe(false);
+  });
+});

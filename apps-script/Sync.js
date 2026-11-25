@@ -1,7 +1,9 @@
 // Sincronização das telas com a planilha.
 // As telas carregam tudo ao entrar (dados.carregar) e, a cada ação, mandam só o que mudou (sync.aplicar).
 var ABAS_APP = { Contas: 'contas', Despesas: 'saidas', Entradas: 'entradas', Previsoes: 'previsoes', Fornecedores: 'fornecedores', Clientes: 'clientes', Parcelamentos: 'parcelamentos', Cheques: 'cheques', SaldosBanco: 'saldosBanco', ContasSemData: 'semData' };
-var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto', 'dirMetas', 'dirMetaFat'];
+var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto', 'dirMetas', 'dirMetaFat', 'acesso'];
+// Configurações que só administrador grava.
+var CONFIG_ADMIN = ['acesso'];
 
 var Sync = {
   // Objeto do app -> linha da aba. Campos sem coluna vão para "extra".
@@ -30,9 +32,23 @@ var Sync = {
     });
     return c;
   },
+  // Administrador = quem tem o módulo Configurações (cfg) nos acessos. Antes de os acessos serem salvos, vale a lista
+  // Config.admins (ou Lucca).
   admins: function () {
-    var a = Sync.config().admins;
+    var c = Sync.config(), ac = c.acesso;
+    if (ac && ac.usuarios && Array.isArray(ac.perfis)) {
+      var r = Object.keys(ac.usuarios).filter(function (u) { return Sync.modsDe_(ac, u).indexOf('cfg') >= 0; });
+      if (r.length) return r;
+    }
+    var a = c.admins;
     return Array.isArray(a) && a.length ? a : ['Lucca'];
+  },
+  modsDe_: function (ac, u) {
+    var x = ac.usuarios[u];
+    if (!x) return [];
+    if (Array.isArray(x.mods)) return x.mods;
+    var p = ac.perfis.filter(function (q) { return q.id === x.perfil; })[0];
+    return p && Array.isArray(p.mods) ? p.mods : [];
   },
   carregar: function (sess) {
     var out = { usuario: sess.usuario, hoje: hoje_(), config: Sync.config() };
@@ -93,6 +109,12 @@ var Sync = {
       if (mud.Config) {
         Object.keys(mud.Config).forEach(function (chave) {
           if (CONFIG_EDITAVEL.indexOf(chave) < 0) throw Auth.erro('config_proibida', 'Configuração não editável pelo app: ' + chave);
+          if (CONFIG_ADMIN.indexOf(chave) >= 0) {
+            Usuarios.exigirAdmin_(sess);
+            var ac = mud.Config[chave];
+            if (!ac || !ac.usuarios || !Array.isArray(ac.perfis)) throw Auth.erro('acesso_invalido', 'Acessos em formato inválido.');
+            if (!Object.keys(ac.usuarios).some(function (u) { return Sync.modsDe_(ac, u).indexOf('cfg') >= 0; })) throw Auth.erro('acesso_sem_admin', 'Pelo menos um usuário precisa continuar com acesso a Configurações.');
+          }
           var v = mud.Config[chave];
           if (v !== null && typeof v === 'object') v = JSON.stringify(v);
           Db.gravarLote('Config', [{ chave: chave, valor: v }], []);

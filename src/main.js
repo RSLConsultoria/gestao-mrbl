@@ -1,6 +1,7 @@
 import './styles/app.css';
 import './styles/extra.css';
 import './styles/diretoria.css';
+import './styles/menu.css';
 import { criarApi } from './api/client.js';
 import { montarLogin } from './ui/login.js';
 import { iniciarTelas } from './app/telas.js';

@@ -28,6 +28,8 @@ function mutar_(sess, tela, fn) {
 acao_('logs.listar', function (d) { return Logs.listar(d); });
 
 acao_('config.definir', function (d, s) {
+  // quem é administrador e quem acessa o quê só o administrador muda
+  if (['acesso', 'admins'].indexOf(String(d.chave)) >= 0) Usuarios.exigirAdmin_(s);
   return mutar_(s, 'cfg', function () {
     var atual = Db.pegar('Config', d.chave);
     if (atual) Db.atualizar('Config', d.chave, { valor: d.valor }); else Db.inserir('Config', { chave: d.chave, valor: d.valor });
