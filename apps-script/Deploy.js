@@ -2,7 +2,7 @@
 // O GitHub (workflow Publicar) chama a ação deploy.publicar com a senha de publicação e o commit.
 // O Apps Script baixa os arquivos desse commit do repositório (que é público), troca o próprio código,
 // cria uma versão e aponta a implantação do Web App para ela. A URL do Web App não muda.
-var REPO_RAW = 'https://raw.githubusercontent.com/RSLConsultoria/mrbl-financeiro/';
+var REPO_RAW = 'https://raw.githubusercontent.com/RSLConsultoria/gestao-mrbl/';
 var API_SCRIPT = 'https://script.googleapis.com/v1/projects/';
 
 var Deploy = {
