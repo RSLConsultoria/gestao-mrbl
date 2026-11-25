@@ -66,5 +66,9 @@ jobs:
         env: { VITE_API_URL: '${{ vars.VITE_API_URL }}' }
       - uses: actions/upload-pages-artifact@v3
         with: { path: dist }
+      # O GitHub às vezes demora alguns segundos para listar o artefato recém-enviado; sem essa espera o
+      # deploy-pages falha com "No artifacts named github-pages" (aconteceu em 25/11/2026).
+      - name: Espera o artefato aparecer
+        run: sleep 20
       - id: deploy
         uses: actions/deploy-pages@v4
