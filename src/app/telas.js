@@ -1842,11 +1842,26 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     h += '<div class="foot"><span id="copyOut"></span></div>';
     app.innerHTML = h;
   }
+  // semanas do financeiro (sábado a sexta) recortadas no mês: [{ n, ini, fim }]
+  function semanasMes(mk){
+    const [y, m] = mk.split('-').map(Number), ult = new Date(y, m, 0).getDate(), p2 = (n) => String(n).padStart(2, '0'), out = [];
+    for (let d = 1; d <= ult;) { const f = Math.min(ult, d + (5 - new Date(y, m - 1, d).getDay() + 7) % 7); out.push({ n: out.length + 1, ini: mk + '-' + p2(d), fim: mk + '-' + p2(f) }); d = f + 1; }
+    return out;
+  }
   function renderDrel(){
     const app = document.getElementById('app');
     const mk = view.drelMes, mm = parseInt(mk.slice(5),10);
-    const ent = S.entradas.filter((e) => e.data.slice(0,7) === mk).sort((a,b) => b.data.localeCompare(a.data));
-    const sai = S.saidas.filter((x) => x.data.slice(0,7) === mk).sort((a,b) => b.data.localeCompare(a.data));
+    // semanas (sábado a sexta) dentro do mês; com uma semana escolhida, a lista e os totais mostram só ela
+    const WK = semanasMes(mk), wkDe = (d) => WK.find((w) => d >= w.ini && d <= w.fim);
+    if (view.drelSem && !WK.some((w) => w.ini === view.drelSem)) view.drelSem = null;
+    const wSel = view.drelSem ? WK.find((w) => w.ini === view.drelSem) : null, naSem = (d) => !wSel || (d >= wSel.ini && d <= wSel.fim);
+    const entM = S.entradas.filter((e) => e.data.slice(0,7) === mk).sort((a,b) => b.data.localeCompare(a.data));
+    const saiM = S.saidas.filter((x) => x.data.slice(0,7) === mk).sort((a,b) => b.data.localeCompare(a.data));
+    const ent = entM.filter((e) => naSem(e.data)), sai = saiM.filter((x) => naSem(x.data));
+    const semTot = (w) => { const en = entM.filter((e) => e.data >= w.ini && e.data <= w.fim && !EXCL_ENT.includes(e.cat)).reduce((a, e) => a + e.valor, 0), sa = saiM.filter((x) => x.data >= w.ini && x.data <= w.fim).reduce((a, x) => a + x.valor, 0); return { en, sa }; };
+    const semHead = (w) => { const t = semTot(w), sd = t.en - t.sa; return '<tr class="wkhead"><td colspan="7"><b>Semana ' + w.n + '</b> · ' + dm(w.ini) + ' a ' + dm(w.fim) + '<span class="s">entrou <b>' + money(t.en) + '</b> · saiu <b>' + money(t.sa) + '</b> · saldo da semana <b style="color:' + (sd < 0 ? 'var(--danger-ink)' : 'var(--ok-ink, #1b7a4b)') + '">' + (sd < 0 ? '−' : '') + money(Math.abs(sd)) + '</b></span></td></tr>'; };
+    const wkBar = '<div class="wkbar" role="group" aria-label="Semana do mês"><button type="button" data-drel="sem:" aria-pressed="' + !wSel + '">Mês todo</button>' +
+      WK.map((w) => '<button type="button" data-drel="sem:' + w.ini + '" aria-pressed="' + (wSel === w) + '">Semana ' + w.n + '<small>' + w.ini.slice(8) + (w.ini === w.fim ? '' : ' a ' + w.fim.slice(8)) + '/' + mk.slice(5) + '</small></button>').join('') + '</div>';
     // separação por dia: cabeçalho com o que entrou (só o que entra no Fluxo de Caixa) e o que saiu no dia
     const diaTot = (d) => { const en = ent.filter((e) => e.data === d && !EXCL_ENT.includes(e.cat)).reduce((a, e) => a + e.valor, 0), sa = sai.filter((x) => x.data === d).reduce((a, x) => a + x.valor, 0); return { en, sa }; };
     const diaHead = (d) => { const t = diaTot(d), sd = t.en - t.sa; return '<tr class="dayhead' + (d === HOJE ? ' istoday' : '') + '"><td colspan="7">' + DIAS[parse(d).getDay()] + ', ' + dm(d) + '<span class="s">entrou <b>' + money(t.en) + '</b> · saiu <b>' + money(t.sa) + '</b> · saldo do dia <b style="color:' + (sd < 0 ? 'var(--danger-ink)' : 'var(--ok-ink, #1b7a4b)') + '">' + (sd < 0 ? '−' : '') + money(Math.abs(sd)) + '</b></span></td></tr>'; };
@@ -1889,16 +1904,16 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     // tabelas do mês
     h += '<section class="panel"><div class="ph"><div class="mnav"><button type="button" class="nav" data-drel="mes:-1" aria-label="Mês anterior">‹</button><h2 style="min-width:190px;text-align:center">' + MESES[mm-1].replace(/^./, (x) => x.toUpperCase()) + ' de ' + mk.slice(0,4) + '</h2><button type="button" class="nav" data-drel="mes:1" aria-label="Próximo mês">›</button>' +
       '<span style="width:12px"></span><button type="button" data-drel="tab:sai" style="' + seg(view.drelTab === 'sai') + '">Despesas · ' + sai.length + '</button><button type="button" data-drel="tab:ent" style="' + seg(view.drelTab === 'ent') + '">Entradas · ' + ent.length + '</button></div>' +
-      '<div class="stats"><div class="stat"><span class="lbl">Despesas</span><b class="num">' + money(sum(sai)) + '</b></div><div class="stat"><span class="lbl">Entradas</span><b class="num">' + money(sum(ent)) + '</b></div><div class="stat"><span class="lbl">Entradas no Fluxo de Caixa</span><b class="num">' + money(naDre) + '</b></div></div></div>';
+      '<div class="stats"><div class="stat"><span class="lbl">Despesas' + (wSel ? ' · semana ' + wSel.n : '') + '</span><b class="num">' + money(sum(sai)) + '</b></div><div class="stat"><span class="lbl">Entradas' + (wSel ? ' · semana ' + wSel.n : '') + '</span><b class="num">' + money(sum(ent)) + '</b></div><div class="stat"><span class="lbl">Entradas no Fluxo de Caixa</span><b class="num">' + money(naDre) + '</b></div></div></div>' + wkBar;
     const sm = (t) => '<small style="display:block;color:var(--muted)">' + esc(t) + '</small>';
     if (view.drelTab === 'sai') {
       h += '<div class="dhist"><table><thead><tr><th style="width:56px">Data</th><th style="width:22%">Fornecedor / descrição</th><th style="width:30%">Categoria · subcategoria</th><th style="width:80px">Empresa</th><th class="r" style="width:104px">Valor</th><th style="width:66px">Resp.</th><th>Observação</th></tr></thead><tbody>';
-      if (!sai.length) h += '<tr><td colspan="7" class="empty">Nenhuma despesa lançada neste mês.</td></tr>';
-      let dAnt = null; sai.forEach((x) => { if (x.data !== dAnt) { dAnt = x.data; h += diaHead(x.data); } h += '<tr class="clk" data-lanc="sai:' + x.id + '" title="Clique para editar ou excluir"><td class="num">' + dm(x.data) + '</td><td>' + esc(x.forn || '—') + (x.contaId ? sm('ligada a Contas a pagar') : '') + '</td><td>' + esc(x.cat || '—') + (x.sub ? sm(x.sub) : '') + '</td><td>' + esc(x.emp || '') + '</td><td class="r num">' + num(x.valor) + '</td><td>' + esc(x.resp || '—') + '</td><td style="color:var(--muted)">' + esc(x.obs || '') + '</td></tr>'; });
+      if (!sai.length) h += '<tr><td colspan="7" class="empty">Nenhuma despesa lançada ' + (wSel ? 'nesta semana' : 'neste mês') + '.</td></tr>';
+      let dAnt = null, wAnt = null; sai.forEach((x) => { const w = wkDe(x.data); if (!wSel && w !== wAnt) { wAnt = w; h += semHead(w); } if (x.data !== dAnt) { dAnt = x.data; h += diaHead(x.data); } h += '<tr class="clk" data-lanc="sai:' + x.id + '" title="Clique para editar ou excluir"><td class="num">' + dm(x.data) + '</td><td>' + esc(x.forn || '—') + (x.contaId ? sm('ligada a Contas a pagar') : '') + '</td><td>' + esc(x.cat || '—') + (x.sub ? sm(x.sub) : '') + '</td><td>' + esc(x.emp || '') + '</td><td class="r num">' + num(x.valor) + '</td><td>' + esc(x.resp || '—') + '</td><td style="color:var(--muted)">' + esc(x.obs || '') + '</td></tr>'; });
     } else {
       h += '<div class="dhist"><table><thead><tr><th style="width:56px">Data</th><th style="width:24%">Categoria</th><th style="width:22%">Cliente</th><th style="width:14%">NF</th><th class="r" style="width:110px">Valor</th><th style="width:66px">Resp.</th><th>Observação</th></tr></thead><tbody>';
-      if (!ent.length) h += '<tr><td colspan="7" class="empty">Nenhuma entrada lançada neste mês.</td></tr>';
-      let dAnt = null; ent.forEach((x) => { const fora = EXCL_ENT.includes(x.cat); if (x.data !== dAnt) { dAnt = x.data; h += diaHead(x.data); } h += '<tr class="clk" data-lanc="ent:' + x.id + '" title="Clique para editar ou excluir"' + (fora ? ' style="opacity:.75"' : '') + '><td class="num">' + dm(x.data) + '</td><td>' + esc(x.cat) + (fora ? sm('não entra no Fluxo de Caixa') : '') + '</td><td>' + esc(x.cli || '—') + '</td><td>' + esc(x.nf || '') + '</td><td class="r num">' + num(x.valor) + '</td><td>' + esc(x.resp || '—') + '</td><td style="color:var(--muted)">' + esc(x.obs || '') + '</td></tr>'; });
+      if (!ent.length) h += '<tr><td colspan="7" class="empty">Nenhuma entrada lançada ' + (wSel ? 'nesta semana' : 'neste mês') + '.</td></tr>';
+      let dAnt = null, wAnt = null; ent.forEach((x) => { const fora = EXCL_ENT.includes(x.cat); const w = wkDe(x.data); if (!wSel && w !== wAnt) { wAnt = w; h += semHead(w); } if (x.data !== dAnt) { dAnt = x.data; h += diaHead(x.data); } h += '<tr class="clk" data-lanc="ent:' + x.id + '" title="Clique para editar ou excluir"' + (fora ? ' style="opacity:.75"' : '') + '><td class="num">' + dm(x.data) + '</td><td>' + esc(x.cat) + (fora ? sm('não entra no Fluxo de Caixa') : '') + '</td><td>' + esc(x.cli || '—') + '</td><td>' + esc(x.nf || '') + '</td><td class="r num">' + num(x.valor) + '</td><td>' + esc(x.resp || '—') + '</td><td style="color:var(--muted)">' + esc(x.obs || '') + '</td></tr>'; });
     }
     h += '</tbody></table></div><div class="hint"><span>Clique num lançamento para editar ou excluir. Toda mudança fica na linha do tempo do lançamento e no log, com o nome de quem fez.</span></div></section>';
     h += '</div></div>';
@@ -2063,7 +2078,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
       if (k === 'mes') { const base = view.dreMes || (DRE_MESES.includes(HOJE.slice(0,7)) ? HOJE.slice(0,7) : '2026-07'); const j = DRE_MESES.indexOf(base) + parseInt(v,10); if (j >= 0 && j < DRE_MESES.length) view.dreMes = DRE_MESES[j]; }
       render(); return; }
     const dl = e.target.closest('[data-drel]');
-    if (dl) { const [k, v] = dl.dataset.drel.split(':'); if (k === 'tab') view.drelTab = v; if (k === 'mes') { const [y,m] = view.drelMes.split('-').map(Number); const d = new Date(y, m-1+parseInt(v,10), 1); view.drelMes = d.getFullYear() + '-' + pad(d.getMonth()+1); } view.removing = null; render(); return; }
+    if (dl) { const [k, v] = dl.dataset.drel.split(':'); if (k === 'tab') view.drelTab = v; if (k === 'sem') view.drelSem = v || null; if (k === 'mes') { view.drelSem = null; const [y,m] = view.drelMes.split('-').map(Number); const d = new Date(y, m-1+parseInt(v,10), 1); view.drelMes = d.getFullYear() + '-' + pad(d.getMonth()+1); } view.removing = null; render(); return; }
     const xb = e.target.closest('button[data-x]');
     if (xb) { const row = xb.closest('[data-xid]'); const L = row.dataset.xk === 'sai' ? 'saidas' : 'entradas'; const it = S[L].find((x) => x.id === row.dataset.xid); const a = xb.dataset.x;
       if (a === 'del') { view.removing = it.id; render(); }

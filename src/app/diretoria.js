@@ -396,6 +396,19 @@ export function criarDiretoria(ctx){
     return h;
   }
 
+  // detalhe de uma subcategoria pelos Lançamentos de Caixa (Fornecedor / descrição). Só existe nos meses lançados
+  // no sistema; os meses do histórico importado não têm descrição e ficam na linha "Sem detalhe".
+  function dirDet(ms, k, sk){
+    const set = new Set(ms), o = { d: {}, v: 0, n: 0 };
+    if (k === 'FORNECEDORES (CMV)' || k === 'FRETE') return o;
+    (S.saidas || []).forEach((c) => {
+      if (!set.has(String(c.data).slice(0, 7)) || c.cat === 'FORNECEDORES (CMV)' || c.cat === 'FRETE' || (c.cat || 'Sem categoria') !== k) return;
+      if ((!c.sub || c.sub === '—' ? 'Sem subcategoria' : c.sub) !== sk) return;
+      const nm = String(c.forn || '').trim().toUpperCase() || '(sem descrição)', x = o.d[nm] = o.d[nm] || { v: 0, n: 0, emp: new Set() }, v = +c.valor || 0;
+      x.v += v; x.n++; if (c.emp) x.emp.add(c.emp); o.v += v; o.n++;
+    });
+    return o;
+  }
   // ================= 3. DESPESAS =================
   function dirRenderDesp(){
     const P = dirPer(), ano = P.ano, Dp = dirDesp(), V = dirV(), FM = dirFatMes(dirFat(false), 'todos');
@@ -439,7 +452,7 @@ export function criarDiretoria(ctx){
       dirPilha({ titulo: 'Proporção das despesas', pct: true, w: 1600, h: 330, cats, grupos: gr, sep,
         tips: (i) => { const t = dirSum(gr.map((g) => g.vals[i])); if (!t) return '<b>' + dirMk(mks[i]) + '</b><div>Sem lançamentos.</div>'; return '<b>' + dirMk(mks[i]) + '</b>' + gr.slice().reverse().map((g) => dirTipRow(g.cor, g.nome, dirP(g.vals[i] / (t || 1)) + ' · ' + dirR(g.vals[i]))).join('') + dirTipRow('', 'Total', dirR(t), true); } }) + '</section>';
     // tabela grupo › subcategoria
-    h += '<section class="panel dpan"><div class="ph"><h2>Despesas por grupo · ' + P.lab + '</h2><span class="dsub">Clique no nome para filtrar por esse grupo, na seta para abrir as subcategorias e no título da coluna para ordenar.</span></div>' +
+    h += '<section class="panel dpan"><div class="ph"><h2>Despesas por grupo · ' + P.lab + '</h2><span class="dsub">Clique no nome para filtrar por esse grupo, na seta para abrir as subcategorias (e, nelas, o que compõe cada uma) e no título da coluna para ordenar.</span></div>' +
       '<div class="pscroll dfull"><table class="ptab dtab dgt"><colgroup><col class="c-g"><col class="c-v"><col class="c-p"><col class="c-m"><col class="c-r"><col class="c-v"><col class="c-d"></colgroup><thead><tr>' + dirTh('desp', 'nome', 'Grupo') + dirTh('desp', 'v', P.lab, 1) + dirTh('desp', 'pf', '% do fat.', 1) + dirTh('desp', 'meta', 'Meta', 1) + dirTh('desp', 'dif', 'Em relação à meta') + dirTh('desp', 'vA', P.labP, 1) + dirTh('desp', 'var', 'Variação', 1) + '</tr></thead>';
     grupos.forEach((k, gi) => {
       const v = GT[k] || 0, vA = GA[k] || 0, pf = fat ? v / fat : null, mt = metas()[k];
@@ -450,7 +463,17 @@ export function criarDiretoria(ctx){
         '<i class="dsw" style="background:' + corG(k) + '"></i><button type="button" class="dfl" data-dfil="' + esc(k) + '" title="Filtrar a tela por ' + esc(dirGNome(k)) + '">' + esc(dirGNome(k)) + '</button></div></td>' +
         '<td class="r num">' + money(v) + '</td><td class="r num">' + dirP(pf) + '</td><td class="r num">' + (mt ? dirP(mt / 100) : '—') + '</td><td>' + dirRegua(pf, mt) + '</td><td class="r num">' + money(vA) + '</td><td class="r">' + dirDelta(dirVar(v, vA), true) + '</td></tr>';
       if (aberto) subs.sort((a, b) => (s[b] || 0) - (s[a] || 0)).forEach((sk) => {
-        h += '<tr class="dsl"><td><span class="dsn">' + esc(sk) + '</span></td><td class="r num">' + money(s[sk] || 0) + '</td><td class="r num">' + dirP(fat ? (s[sk] || 0) / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(v ? (s[sk] || 0) / v : null) + ' do grupo</span></td><td class="r num">' + money(sA[sk] || 0) + '</td><td class="r">' + dirDelta(dirVar(s[sk] || 0, sA[sk] || 0), true) + '</td></tr>';
+        const dt = dirDet(P.ms, k, sk), dtA = dirDet(P.prev, k, sk), sid = k + '|' + sk, sab = dt.n + dtA.n > 0 && !!(V.sexp || {})[sid];
+        h += '<tr class="dsl' + (sab ? ' ab' : '') + '"><td><span class="dsn dsx">' + (dt.n + dtA.n > 0 ? '<button type="button" class="dexp sm" data-dsexp="' + esc(sid) + '" aria-expanded="' + sab + '" aria-label="' + (sab ? 'Fechar' : 'Abrir') + ' o detalhe de ' + esc(sk) + '">' + (sab ? '▾' : '▸') + '</button>' : '<span class="dexp sm"></span>') + '<span class="dst">' + esc(sk) + '</span></span></td><td class="r num">' + money(s[sk] || 0) + '</td><td class="r num">' + dirP(fat ? (s[sk] || 0) / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(v ? (s[sk] || 0) / v : null) + ' do grupo</span></td><td class="r num">' + money(sA[sk] || 0) + '</td><td class="r">' + dirDelta(dirVar(s[sk] || 0, sA[sk] || 0), true) + '</td></tr>';
+        if (!sab) return;
+        // 3º nível: o que compõe a subcategoria, pela descrição do lançamento
+        const vs = s[sk] || 0, vsA = sA[sk] || 0, z0 = { v: 0, n: 0, emp: new Set() };
+        Object.keys(Object.assign({}, dt.d, dtA.d)).sort((a, b) => ((dt.d[b] || z0).v - (dt.d[a] || z0).v) || ((dtA.d[b] || z0).v - (dtA.d[a] || z0).v)).forEach((nm) => {
+          const x = dt.d[nm] || z0, xa = dtA.d[nm] || z0;
+          h += '<tr class="ddl"><td><span class="ddn" title="' + esc(nm) + '">' + esc(nm) + '<small>' + (x.n ? x.n + (x.n === 1 ? ' lançamento' : ' lançamentos') + (x.emp.size ? ' · ' + [...x.emp].sort().join(' e ') : '') : 'só em ' + P.labP) + '</small></span></td><td class="r num">' + money(x.v) + '</td><td class="r num">' + dirP(fat ? x.v / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(vs ? x.v / vs : null) + ' da subcategoria</span></td><td class="r num">' + money(xa.v) + '</td><td class="r">' + dirDelta(dirVar(x.v, xa.v), true) + '</td></tr>';
+        });
+        const r = vs - dt.v, rA = vsA - dtA.v;
+        if (Math.abs(r) > 1 || Math.abs(rA) > 1) h += '<tr class="ddl dds"><td><span class="ddn">Sem detalhe<small>meses do histórico importado, que não têm a descrição</small></span></td><td class="r num">' + money(r) + '</td><td class="r num">' + dirP(fat ? r / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(vs ? r / vs : null) + ' da subcategoria</span></td><td class="r num">' + money(rA) + '</td><td class="r"><span class="ddl">—</span></td></tr>';
       });
       h += '</tbody>';
     });
@@ -690,6 +713,7 @@ export function criarDiretoria(ctx){
     const so = t.closest('[data-dsort]'); if (so && dirTela()) { const [tab, k] = so.dataset.dsort.split(':'), V = dirV(), S0 = V.sort = V.sort || {}, cur = S0[tab] || {};
       S0[tab] = cur.k === k ? { k, d: -(cur.d || -1) } : { k, d: k === 'nome' ? 1 : -1 }; if (tab === 'desp' && cur.k === k && cur.d === 1 && k !== 'nome') delete S0[tab]; render(); return; }
     const df = t.closest('[data-dfil]'); if (df && view.tela === 'dird') { const V = dirV(), k = df.dataset.dfil; V.desp = (V.desp || []).length === 1 && V.desp[0] === k ? [] : [k]; render(); return; }
+    const sx = t.closest('[data-dsexp]'); if (sx && dirTela()) { const V = dirV(); V.sexp = V.sexp || {}; V.sexp[sx.dataset.dsexp] = sx.getAttribute('aria-expanded') !== 'true'; render(); return; }
     const ge = t.closest('[data-dgexp]'); if (ge && dirTela()) { const V = dirV(), k = ge.dataset.dgexp; V.gexp[k] = ge.getAttribute('aria-expanded') !== 'true'; render(); return; }
     const ke = t.closest('[data-dkexp]'); if (ke && dirTela()) { const V = dirV(), k = ke.dataset.dkexp; V.kexp[k] = !V.kexp[k]; render(); return; }
     const dc = t.closest('[data-dcfg]');
