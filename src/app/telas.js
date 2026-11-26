@@ -3072,7 +3072,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
 
   const DIR = criarDiretoria({ getS: () => S, view, render, act, toast, api, esc, money, num, pad, cap, MESES, MES3, mesNome, mAdd, CUR, agora, cellVal, normTxt,
     carregarExcel: () => loadJs(XLS), admin: ADMIN, fat: dados.fatHistorico || [], imp: CFG.dirFatImp,
-    DRE_ANO: +DRE_MESES[0].slice(0, 4), dreData, histAno, parcInfo, chqSit, chqValor });
+    DRE_ANO: +DRE_MESES[0].slice(0, 4), dreData, histAno, parcInfo, chqSit, chqValor, abrirLanc: (k, id) => openLanc(k, id) });
   render();
   return { recarregar: (d) => d };
 }

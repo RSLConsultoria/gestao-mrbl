@@ -410,51 +410,53 @@ export function criarDiretoria(ctx){
     return o;
   }
   // ---------- lançamentos de um item do 3º nível: modais empilhados por cima da tela de Despesas ----------
-  // Vários lançamentos: lista; clicar num deles abre o detalhe por cima. Um lançamento só: abre direto o detalhe.
-  let dirDetIdx = [], dlmItens = [];
+  // Vários lançamentos: lista; clicar num deles abre por cima o MESMO modal de Lançamentos de Caixa (editar, excluir,
+  // linha do tempo). Um lançamento só: abre direto esse modal. O que mudar lá vale para as duas telas (é o mesmo lançamento).
+  let dirDetIdx = [], dlmItens = [], dlmLista = null;
   const dlmDt = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) + '/' + String(d).slice(0, 4) : '—';
   const dlmX = '<button type="button" class="dlmx" data-dlmx aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
-  function dlmPush(html, cls){
-    let host = document.getElementById('dlmHost'); if (!host) { host = document.createElement('div'); host.id = 'dlmHost'; document.body.appendChild(host); }
-    const bg = document.createElement('div'); bg.className = 'dlmbg'; bg.style.zIndex = 90 + host.children.length * 2;
-    bg.innerHTML = '<div class="dlm ' + cls + '" role="dialog" aria-modal="true">' + html + '</div>'; host.appendChild(bg);
-    document.documentElement.classList.add('dlm-lock');   // trava a rolagem da tela enquanto houver modal aberto
-    const x = bg.querySelector('[data-dlmx]'); if (x) x.focus();
-  }
-  const dlmPop = () => { const host = document.getElementById('dlmHost'); if (host && host.lastElementChild) host.removeChild(host.lastElementChild); if (!host || !host.children.length) document.documentElement.classList.remove('dlm-lock'); };
-  function dirLancAbrir(i){ const g = dirDetIdx[i]; if (!g || !g.itens.length) return; if (g.itens.length === 1) dirLancInfo(g.itens[0]); else dirLancLista(g); }
-  function dirLancLista(g){
+  const dlmFechar = () => { const host = document.getElementById('dlmHost'); if (host) host.innerHTML = ''; dlmLista = null; document.documentElement.classList.remove('dlm-lock'); };
+  const abrirLanc = (c) => { if (c && ctx.abrirLanc) ctx.abrirLanc('sai', c.id); };
+  function dirLancAbrir(i){ const g = dirDetIdx[i]; if (!g || !g.itens.length) return; if (g.itens.length === 1) abrirLanc(g.itens[0]); else dirLancLista(g); }
+  function dlmListaHTML(g){
     dlmItens = g.itens.slice().sort((a, b) => String(b.data).localeCompare(String(a.data)) || (+b.valor || 0) - (+a.valor || 0));
     const tot = dirSum(dlmItens.map((c) => +c.valor || 0));
-    dlmPush('<div class="dlmh"><div><h2>' + esc(g.nome) + '</h2><small>' + esc(dirGNome(g.grupo)) + ' › ' + esc(g.sub) + ' · ' + esc(g.per) + ' · ' + dlmItens.length + ' lançamentos · ' + money(tot) + '</small></div>' + dlmX + '</div>' +
+    return '<div class="dlm lista" role="dialog" aria-modal="true"><div class="dlmh"><div><h2>' + esc(g.nome) + '</h2><small>' + esc(dirGNome(g.grupo)) + ' › ' + esc(g.sub) + ' · ' + esc(g.per) + ' · ' + dlmItens.length + (dlmItens.length === 1 ? ' lançamento · ' : ' lançamentos · ') + money(tot) + '</small></div>' + dlmX + '</div>' +
       '<div class="dlmb"><table class="dlmt"><colgroup><col style="width:120px"><col><col style="width:90px"><col style="width:136px"><col style="width:90px"><col></colgroup><thead><tr><th>Data</th><th>Fornecedor / descrição</th><th>Empresa</th><th class="r">Valor</th><th>Resp.</th><th>Observação</th></tr></thead><tbody>' +
-      dlmItens.map((c, i) => '<tr data-dlmi="' + i + '" tabindex="0" title="Ver o lançamento"><td class="num">' + dlmDt(c.data) + '</td><td>' + esc(c.forn || '—') + '</td><td>' + esc(c.emp || '—') + '</td><td class="r num">' + money(+c.valor || 0) + '</td><td>' + esc(c.resp || '—') + '</td><td class="m">' + esc(c.obs || '') + '</td></tr>').join('') +
-      '</tbody><tfoot><tr><td colspan="3">Total</td><td class="r num">' + money(tot) + '</td><td colspan="2"></td></tr></tfoot></table></div>', 'lista');
+      dlmItens.map((c, i) => '<tr data-dlmi="' + i + '" tabindex="0" title="Abrir o lançamento"><td class="num">' + dlmDt(c.data) + '</td><td>' + esc(c.forn || '—') + '</td><td>' + esc(c.emp || '—') + '</td><td class="r num">' + money(+c.valor || 0) + '</td><td>' + esc(c.resp || '—') + '</td><td class="m">' + esc(c.obs || '') + '</td></tr>').join('') +
+      '</tbody><tfoot><tr><td colspan="3">Total</td><td class="r num">' + money(tot) + '</td><td colspan="2"></td></tr></tfoot></table></div></div>';
   }
-  function dirLancInfo(c){
-    const conta = c.contaId && (S.contas || []).find((x) => x.id === c.contaId);
-    const f = (lab, v, w) => '<div class="dlmf' + (w ? ' w' : '') + '"><span>' + lab + '</span><b>' + v + '</b></div>';
-    dlmPush('<div class="dlmh"><div><h2>' + esc(c.forn || '—') + '</h2><small>Lançamento de caixa · pago em ' + dlmDt(c.data) + '</small></div>' + dlmX + '</div><div class="dlmb"><div class="dlmg">' +
-      f('Data do pagamento', dlmDt(c.data)) + f('Valor', '<span class="num">' + money(+c.valor || 0) + '</span>') + f('Categoria', esc(c.cat || '—')) + f('Subcategoria', esc(c.sub || '—')) +
-      f('Empresa', esc(c.emp || '—')) + f('Responsável', esc(c.resp || '—')) + f('Fornecedor / descrição', esc(c.forn || '—'), 1) +
-      f('Contas a pagar', conta ? 'Ligado à conta de ' + esc(conta.forn || '—') + ' · vencimento original ' + dlmDt(conta.orig || conta.data) + (conta.pagoEm ? ' · paga em ' + dlmDt(conta.pagoEm) : '') : 'Lançado direto no caixa, sem conta a pagar', 1) +
-      f('Observação', esc(c.obs || '—'), 1) + '</div></div>', 'info');
+  function dirLancLista(g){
+    let host = document.getElementById('dlmHost'); if (!host) { host = document.createElement('div'); host.id = 'dlmHost'; document.body.appendChild(host); }
+    dlmLista = g; host.innerHTML = '<div class="dlmbg">' + dlmListaHTML(g) + '</div>';
+    document.documentElement.classList.add('dlm-lock');   // trava a rolagem da tela enquanto houver modal aberto
+    const x = host.querySelector('[data-dlmx]'); if (x) x.focus();
+  }
+  // depois de editar ou excluir no modal do lançamento, a lista se refaz com os dados novos (pode sair item, mudar valor)
+  function dlmAtualiza(){
+    const host = document.getElementById('dlmHost'); if (!dlmLista || !host || !host.firstElementChild) return;
+    const g = dlmLista, x = dirDet(g.ms, g.grupo, g.sub).d[g.nome], itens = x ? x.itens : [];
+    if (!itens.length) { dlmFechar(); return; }
+    g.itens = itens; host.firstElementChild.innerHTML = dlmListaHTML(g);
   }
   document.addEventListener('click', (e) => {
-    const host = document.getElementById('dlmHost'); if (!host || !host.children.length || !host.contains(e.target)) return;
-    if (e.target.closest('[data-dlmx]') || e.target.classList.contains('dlmbg')) { dlmPop(); return; }
-    const r = e.target.closest('[data-dlmi]'); if (r) dirLancInfo(dlmItens[+r.dataset.dlmi]);
+    const host = document.getElementById('dlmHost'); if (!host || !host.children.length || !host.contains(e.target) || view.modal) return;
+    if (e.target.closest('[data-dlmx]') || e.target.classList.contains('dlmbg')) { dlmFechar(); return; }
+    const r = e.target.closest('[data-dlmi]'); if (r) abrirLanc(dlmItens[+r.dataset.dlmi]);
   });
+  // "Ver em Contas a pagar ›" dentro do modal do lançamento sai da Diretoria: a lista fecha junto
+  document.addEventListener('click', (e) => { if (e.target.closest && e.target.closest('[data-gopay]') && dlmLista) dlmFechar(); }, true);
   document.addEventListener('keydown', (e) => {
+    if (view.modal) return;   // o modal do lançamento (por cima) cuida do próprio Esc
     const host = document.getElementById('dlmHost'), aberto = host && host.children.length;
-    if (aberto && e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); dlmPop(); return; }
+    if (aberto && e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); dlmFechar(); return; }
     if (e.key !== 'Enter' || !e.target.closest) return;
-    const r = aberto && e.target.closest('[data-dlmi]'); if (r) { e.preventDefault(); dirLancInfo(dlmItens[+r.dataset.dlmi]); return; }
+    const r = aberto && e.target.closest('[data-dlmi]'); if (r) { e.preventDefault(); abrirLanc(dlmItens[+r.dataset.dlmi]); return; }
     const d = !aberto && dirTela() && e.target.closest('[data-ddi]'); if (d) { e.preventDefault(); dirLancAbrir(+d.dataset.ddi); }
   }, true);
   // ================= 3. DESPESAS =================
   function dirRenderDesp(){
-    dirDetIdx = [];
+    dirDetIdx = []; dlmAtualiza();
     const P = dirPer(), ano = P.ano, Dp = dirDesp(), V = dirV(), FM = dirFatMes(dirFat(false), 'todos');
     if (!V.desp) V.desp = [];
     const sel = V.desp, um = sel.length === 1 ? sel[0] : null;
@@ -514,7 +516,7 @@ export function criarDiretoria(ctx){
         const vs = s[sk] || 0, vsA = sA[sk] || 0, z0 = { v: 0, n: 0, emp: new Set(), itens: [] };
         Object.keys(Object.assign({}, dt.d, dtA.d)).sort((a, b) => ((dt.d[b] || z0).v - (dt.d[a] || z0).v) || ((dtA.d[b] || z0).v - (dtA.d[a] || z0).v)).forEach((nm) => {
           const x = dt.d[nm] || z0, xa = dtA.d[nm] || z0;
-          const di = dirDetIdx.push({ nome: nm, grupo: k, sub: sk, per: x.n ? P.lab : P.labP, itens: x.n ? x.itens : xa.itens }) - 1;
+          const di = dirDetIdx.push({ nome: nm, grupo: k, sub: sk, per: x.n ? P.lab : P.labP, ms: x.n ? P.ms : P.prev, itens: x.n ? x.itens : xa.itens }) - 1;
           h += '<tr class="ddl clk" data-ddi="' + di + '" tabindex="0" title="Ver os lançamentos"><td><span class="ddn">' + esc(nm) + '<small>' + (x.n ? x.n + (x.n === 1 ? ' lançamento' : ' lançamentos') + (x.emp.size ? ' · ' + [...x.emp].sort().join(' e ') : '') : 'só em ' + P.labP) + '</small></span></td><td class="r num">' + money(x.v) + '</td><td class="r num">' + dirP(fat ? x.v / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(vs ? x.v / vs : null) + ' da subcategoria</span></td><td class="r num">' + money(xa.v) + '</td><td class="r">' + dirDelta(dirVar(x.v, xa.v), true) + '</td></tr>';
         });
         const r = vs - dt.v, rA = vsA - dtA.v;
