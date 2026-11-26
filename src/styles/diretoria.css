@@ -182,3 +182,36 @@ table.dgt tr.ddl td:first-child{box-shadow:inset 3px 0 0 #D5DBEA;white-space:now
 table.dgt .ddn{display:block;padding-left:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 table.dgt .ddn small{display:inline;white-space:nowrap;margin-left:8px;font-size:11.5px;color:var(--muted)}
 table.dgt tr.dds td{color:var(--muted);font-style:italic}
+
+/* Despesas: linhas do 3º nível abrem os lançamentos; modais empilhados */
+table.dgt tr.ddl.clk{cursor:pointer}
+table.dgt tr.ddl.clk:hover td,table.dgt tr.ddl.clk:focus-visible td{background:var(--blue-soft)}
+table.dgt tr.ddl.clk:focus-visible{outline:2px solid var(--navy);outline-offset:-2px}
+.dlmbg{position:fixed;inset:0;background:rgba(11,26,85,.32);display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.dlmbg+.dlmbg{background:rgba(11,26,85,.16)}
+.dlm{background:#fff;border-top:4px solid var(--yellow);box-shadow:0 18px 44px rgba(11,26,85,.30);width:min(1000px,100%);max-height:calc(100vh - 48px);display:flex;flex-direction:column;color:var(--ink)}
+.dlm.info{width:min(640px,100%)}
+.dlmh{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:16px 16px 12px 20px;border-bottom:1px solid var(--line)}
+.dlmh h2{margin:0;font-size:18px;line-height:24px}
+.dlmh small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.dlmx{flex:none;width:34px;height:34px;border:0;background:none;color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.dlmx:hover{background:var(--blue-soft);color:var(--ink)}
+.dlmx:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
+.dlmb{overflow-y:auto;min-height:0}
+.dlm table.dlmt{width:100%;min-width:0!important;border-collapse:collapse;table-layout:fixed;font-size:13.5px}
+.dlm table.dlmt th{position:sticky;top:0;z-index:1;background:var(--blue-soft);box-shadow:0 1px 0 var(--line);text-align:left;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:8px 12px}
+.dlm table.dlmt th.r,.dlm table.dlmt td.r{text-align:right}
+.dlm table.dlmt td{padding:7px 12px;border-top:0;border-bottom:1px solid #EEF0F5;vertical-align:top;overflow-wrap:anywhere}
+.dlm table.dlmt tbody tr:nth-child(even) td{background:#F5F6FA}
+.dlm table.dlmt tbody tr{cursor:pointer}
+.dlm table.dlmt tbody tr:hover td,.dlm table.dlmt tbody tr:focus-visible td{background:var(--blue-soft)}
+.dlm table.dlmt tbody tr:focus-visible{outline:2px solid var(--navy);outline-offset:-2px}
+.dlm table.dlmt td.m{color:var(--muted)}
+.dlm table.dlmt td.num{white-space:nowrap}
+.dlmf b,.dlmf b .num{font-size:15px}
+.dlm table.dlmt tfoot td{border-top:2px solid var(--navy);border-bottom:0;font-weight:700;padding:8px 12px;background:#fff}
+.dlmg{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line);border-left:1px solid var(--line);margin:16px 20px 20px}
+.dlmf{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.dlmf.w{grid-column:1/-1}
+.dlmf span{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.dlmf b{display:block;font-weight:600;margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere}

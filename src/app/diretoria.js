@@ -404,13 +404,56 @@ export function criarDiretoria(ctx){
     (S.saidas || []).forEach((c) => {
       if (!set.has(String(c.data).slice(0, 7)) || c.cat === 'FORNECEDORES (CMV)' || c.cat === 'FRETE' || (c.cat || 'Sem categoria') !== k) return;
       if ((!c.sub || c.sub === '—' ? 'Sem subcategoria' : c.sub) !== sk) return;
-      const nm = String(c.forn || '').trim().toUpperCase() || '(sem descrição)', x = o.d[nm] = o.d[nm] || { v: 0, n: 0, emp: new Set() }, v = +c.valor || 0;
-      x.v += v; x.n++; if (c.emp) x.emp.add(c.emp); o.v += v; o.n++;
+      const nm = String(c.forn || '').trim().toUpperCase() || '(sem descrição)', x = o.d[nm] = o.d[nm] || { v: 0, n: 0, emp: new Set(), itens: [] }, v = +c.valor || 0;
+      x.v += v; x.n++; x.itens.push(c); if (c.emp) x.emp.add(c.emp); o.v += v; o.n++;
     });
     return o;
   }
+  // ---------- lançamentos de um item do 3º nível: modais empilhados por cima da tela de Despesas ----------
+  // Vários lançamentos: lista; clicar num deles abre o detalhe por cima. Um lançamento só: abre direto o detalhe.
+  let dirDetIdx = [], dlmItens = [];
+  const dlmDt = (d) => d ? String(d).slice(8, 10) + '/' + String(d).slice(5, 7) + '/' + String(d).slice(0, 4) : '—';
+  const dlmX = '<button type="button" class="dlmx" data-dlmx aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+  function dlmPush(html, cls){
+    let host = document.getElementById('dlmHost'); if (!host) { host = document.createElement('div'); host.id = 'dlmHost'; document.body.appendChild(host); }
+    const bg = document.createElement('div'); bg.className = 'dlmbg'; bg.style.zIndex = 90 + host.children.length * 2;
+    bg.innerHTML = '<div class="dlm ' + cls + '" role="dialog" aria-modal="true">' + html + '</div>'; host.appendChild(bg);
+    const x = bg.querySelector('[data-dlmx]'); if (x) x.focus();
+  }
+  const dlmPop = () => { const host = document.getElementById('dlmHost'); if (host && host.lastElementChild) host.removeChild(host.lastElementChild); };
+  function dirLancAbrir(i){ const g = dirDetIdx[i]; if (!g || !g.itens.length) return; if (g.itens.length === 1) dirLancInfo(g.itens[0]); else dirLancLista(g); }
+  function dirLancLista(g){
+    dlmItens = g.itens.slice().sort((a, b) => String(b.data).localeCompare(String(a.data)) || (+b.valor || 0) - (+a.valor || 0));
+    const tot = dirSum(dlmItens.map((c) => +c.valor || 0));
+    dlmPush('<div class="dlmh"><div><h2>' + esc(g.nome) + '</h2><small>' + esc(dirGNome(g.grupo)) + ' › ' + esc(g.sub) + ' · ' + esc(g.per) + ' · ' + dlmItens.length + ' lançamentos · ' + money(tot) + '</small></div>' + dlmX + '</div>' +
+      '<div class="dlmb"><table class="dlmt"><colgroup><col style="width:120px"><col><col style="width:90px"><col style="width:136px"><col style="width:90px"><col></colgroup><thead><tr><th>Data</th><th>Fornecedor / descrição</th><th>Empresa</th><th class="r">Valor</th><th>Resp.</th><th>Observação</th></tr></thead><tbody>' +
+      dlmItens.map((c, i) => '<tr data-dlmi="' + i + '" tabindex="0" title="Ver o lançamento"><td class="num">' + dlmDt(c.data) + '</td><td>' + esc(c.forn || '—') + '</td><td>' + esc(c.emp || '—') + '</td><td class="r num">' + money(+c.valor || 0) + '</td><td>' + esc(c.resp || '—') + '</td><td class="m">' + esc(c.obs || '') + '</td></tr>').join('') +
+      '</tbody><tfoot><tr><td colspan="3">Total</td><td class="r num">' + money(tot) + '</td><td colspan="2"></td></tr></tfoot></table></div>', 'lista');
+  }
+  function dirLancInfo(c){
+    const conta = c.contaId && (S.contas || []).find((x) => x.id === c.contaId);
+    const f = (lab, v, w) => '<div class="dlmf' + (w ? ' w' : '') + '"><span>' + lab + '</span><b>' + v + '</b></div>';
+    dlmPush('<div class="dlmh"><div><h2>' + esc(c.forn || '—') + '</h2><small>Lançamento de caixa · pago em ' + dlmDt(c.data) + '</small></div>' + dlmX + '</div><div class="dlmb"><div class="dlmg">' +
+      f('Data do pagamento', dlmDt(c.data)) + f('Valor', '<span class="num">' + money(+c.valor || 0) + '</span>') + f('Categoria', esc(c.cat || '—')) + f('Subcategoria', esc(c.sub || '—')) +
+      f('Empresa', esc(c.emp || '—')) + f('Responsável', esc(c.resp || '—')) + f('Fornecedor / descrição', esc(c.forn || '—'), 1) +
+      f('Contas a pagar', conta ? 'Ligado à conta de ' + esc(conta.forn || '—') + ' · vencimento original ' + dlmDt(conta.orig || conta.data) + (conta.pagoEm ? ' · paga em ' + dlmDt(conta.pagoEm) : '') : 'Lançado direto no caixa, sem conta a pagar', 1) +
+      f('Observação', esc(c.obs || '—'), 1) + '</div></div>', 'info');
+  }
+  document.addEventListener('click', (e) => {
+    const host = document.getElementById('dlmHost'); if (!host || !host.children.length || !host.contains(e.target)) return;
+    if (e.target.closest('[data-dlmx]') || e.target.classList.contains('dlmbg')) { dlmPop(); return; }
+    const r = e.target.closest('[data-dlmi]'); if (r) dirLancInfo(dlmItens[+r.dataset.dlmi]);
+  });
+  document.addEventListener('keydown', (e) => {
+    const host = document.getElementById('dlmHost'), aberto = host && host.children.length;
+    if (aberto && e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); dlmPop(); return; }
+    if (e.key !== 'Enter' || !e.target.closest) return;
+    const r = aberto && e.target.closest('[data-dlmi]'); if (r) { e.preventDefault(); dirLancInfo(dlmItens[+r.dataset.dlmi]); return; }
+    const d = !aberto && dirTela() && e.target.closest('[data-ddi]'); if (d) { e.preventDefault(); dirLancAbrir(+d.dataset.ddi); }
+  }, true);
   // ================= 3. DESPESAS =================
   function dirRenderDesp(){
+    dirDetIdx = [];
     const P = dirPer(), ano = P.ano, Dp = dirDesp(), V = dirV(), FM = dirFatMes(dirFat(false), 'todos');
     if (!V.desp) V.desp = [];
     const sel = V.desp, um = sel.length === 1 ? sel[0] : null;
@@ -452,7 +495,7 @@ export function criarDiretoria(ctx){
       dirPilha({ titulo: 'Proporção das despesas', pct: true, w: 1600, h: 330, cats, grupos: gr, sep,
         tips: (i) => { const t = dirSum(gr.map((g) => g.vals[i])); if (!t) return '<b>' + dirMk(mks[i]) + '</b><div>Sem lançamentos.</div>'; return '<b>' + dirMk(mks[i]) + '</b>' + gr.slice().reverse().map((g) => dirTipRow(g.cor, g.nome, dirP(g.vals[i] / (t || 1)) + ' · ' + dirR(g.vals[i]))).join('') + dirTipRow('', 'Total', dirR(t), true); } }) + '</section>';
     // tabela grupo › subcategoria
-    h += '<section class="panel dpan"><div class="ph"><h2>Despesas por grupo · ' + P.lab + '</h2><span class="dsub">Clique no nome para filtrar por esse grupo, na seta para abrir as subcategorias (e, nelas, o que compõe cada uma) e no título da coluna para ordenar.</span></div>' +
+    h += '<section class="panel dpan"><div class="ph"><h2>Despesas por grupo · ' + P.lab + '</h2><span class="dsub">Clique no nome para filtrar por esse grupo, na seta para abrir as subcategorias (e, nelas, o que compõe cada uma; clique numa linha dessas para ver os lançamentos) e no título da coluna para ordenar.</span></div>' +
       '<div class="pscroll dfull"><table class="ptab dtab dgt"><colgroup><col class="c-g"><col class="c-v"><col class="c-p"><col class="c-m"><col class="c-r"><col class="c-v"><col class="c-d"></colgroup><thead><tr>' + dirTh('desp', 'nome', 'Grupo') + dirTh('desp', 'v', P.lab, 1) + dirTh('desp', 'pf', '% do fat.', 1) + dirTh('desp', 'meta', 'Meta', 1) + dirTh('desp', 'dif', 'Em relação à meta') + dirTh('desp', 'vA', P.labP, 1) + dirTh('desp', 'var', 'Variação', 1) + '</tr></thead>';
     grupos.forEach((k, gi) => {
       const v = GT[k] || 0, vA = GA[k] || 0, pf = fat ? v / fat : null, mt = metas()[k];
@@ -467,10 +510,11 @@ export function criarDiretoria(ctx){
         h += '<tr class="dsl' + (sab ? ' ab' : '') + '"><td><span class="dsn dsx">' + (dt.n + dtA.n > 0 ? '<button type="button" class="dexp sm" data-dsexp="' + esc(sid) + '" aria-expanded="' + sab + '" aria-label="' + (sab ? 'Fechar' : 'Abrir') + ' o detalhe de ' + esc(sk) + '">' + (sab ? '▾' : '▸') + '</button>' : '<span class="dexp sm"></span>') + '<span class="dst">' + esc(sk) + '</span></span></td><td class="r num">' + money(s[sk] || 0) + '</td><td class="r num">' + dirP(fat ? (s[sk] || 0) / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(v ? (s[sk] || 0) / v : null) + ' do grupo</span></td><td class="r num">' + money(sA[sk] || 0) + '</td><td class="r">' + dirDelta(dirVar(s[sk] || 0, sA[sk] || 0), true) + '</td></tr>';
         if (!sab) return;
         // 3º nível: o que compõe a subcategoria, pela descrição do lançamento
-        const vs = s[sk] || 0, vsA = sA[sk] || 0, z0 = { v: 0, n: 0, emp: new Set() };
+        const vs = s[sk] || 0, vsA = sA[sk] || 0, z0 = { v: 0, n: 0, emp: new Set(), itens: [] };
         Object.keys(Object.assign({}, dt.d, dtA.d)).sort((a, b) => ((dt.d[b] || z0).v - (dt.d[a] || z0).v) || ((dtA.d[b] || z0).v - (dtA.d[a] || z0).v)).forEach((nm) => {
           const x = dt.d[nm] || z0, xa = dtA.d[nm] || z0;
-          h += '<tr class="ddl"><td><span class="ddn" title="' + esc(nm) + '">' + esc(nm) + '<small>' + (x.n ? x.n + (x.n === 1 ? ' lançamento' : ' lançamentos') + (x.emp.size ? ' · ' + [...x.emp].sort().join(' e ') : '') : 'só em ' + P.labP) + '</small></span></td><td class="r num">' + money(x.v) + '</td><td class="r num">' + dirP(fat ? x.v / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(vs ? x.v / vs : null) + ' da subcategoria</span></td><td class="r num">' + money(xa.v) + '</td><td class="r">' + dirDelta(dirVar(x.v, xa.v), true) + '</td></tr>';
+          const di = dirDetIdx.push({ nome: nm, grupo: k, sub: sk, per: x.n ? P.lab : P.labP, itens: x.n ? x.itens : xa.itens }) - 1;
+          h += '<tr class="ddl clk" data-ddi="' + di + '" tabindex="0" title="Ver os lançamentos"><td><span class="ddn">' + esc(nm) + '<small>' + (x.n ? x.n + (x.n === 1 ? ' lançamento' : ' lançamentos') + (x.emp.size ? ' · ' + [...x.emp].sort().join(' e ') : '') : 'só em ' + P.labP) + '</small></span></td><td class="r num">' + money(x.v) + '</td><td class="r num">' + dirP(fat ? x.v / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(vs ? x.v / vs : null) + ' da subcategoria</span></td><td class="r num">' + money(xa.v) + '</td><td class="r">' + dirDelta(dirVar(x.v, xa.v), true) + '</td></tr>';
         });
         const r = vs - dt.v, rA = vsA - dtA.v;
         if (Math.abs(r) > 1 || Math.abs(rA) > 1) h += '<tr class="ddl dds"><td><span class="ddn">Sem detalhe<small>meses do histórico importado, que não têm a descrição</small></span></td><td class="r num">' + money(r) + '</td><td class="r num">' + dirP(fat ? r / fat : null) + '</td><td></td><td><span class="dsh">' + dirP(vs ? r / vs : null) + ' da subcategoria</span></td><td class="r num">' + money(rA) + '</td><td class="r"><span class="ddl">—</span></td></tr>';
@@ -713,6 +757,7 @@ export function criarDiretoria(ctx){
     const so = t.closest('[data-dsort]'); if (so && dirTela()) { const [tab, k] = so.dataset.dsort.split(':'), V = dirV(), S0 = V.sort = V.sort || {}, cur = S0[tab] || {};
       S0[tab] = cur.k === k ? { k, d: -(cur.d || -1) } : { k, d: k === 'nome' ? 1 : -1 }; if (tab === 'desp' && cur.k === k && cur.d === 1 && k !== 'nome') delete S0[tab]; render(); return; }
     const df = t.closest('[data-dfil]'); if (df && view.tela === 'dird') { const V = dirV(), k = df.dataset.dfil; V.desp = (V.desp || []).length === 1 && V.desp[0] === k ? [] : [k]; render(); return; }
+    const dd = t.closest('[data-ddi]'); if (dd && dirTela()) { dirLancAbrir(+dd.dataset.ddi); return; }
     const sx = t.closest('[data-dsexp]'); if (sx && dirTela()) { const V = dirV(); V.sexp = V.sexp || {}; V.sexp[sx.dataset.dsexp] = sx.getAttribute('aria-expanded') !== 'true'; render(); return; }
     const ge = t.closest('[data-dgexp]'); if (ge && dirTela()) { const V = dirV(), k = ge.dataset.dgexp; V.gexp[k] = ge.getAttribute('aria-expanded') !== 'true'; render(); return; }
     const ke = t.closest('[data-dkexp]'); if (ke && dirTela()) { const V = dirV(), k = ke.dataset.dkexp; V.kexp[k] = !V.kexp[k]; render(); return; }
