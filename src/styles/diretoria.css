@@ -215,3 +215,6 @@ table.dgt tr.ddl.clk:focus-visible{outline:2px solid var(--navy);outline-offset:
 .dlmf.w{grid-column:1/-1}
 .dlmf span{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .dlmf b{display:block;font-weight:600;margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere}
+
+html.dlm-lock,html.dlm-lock body{overflow:hidden!important;overscroll-behavior:none}
+html.dlm-lock{scrollbar-gutter:stable}

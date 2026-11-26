@@ -418,9 +418,10 @@ export function criarDiretoria(ctx){
     let host = document.getElementById('dlmHost'); if (!host) { host = document.createElement('div'); host.id = 'dlmHost'; document.body.appendChild(host); }
     const bg = document.createElement('div'); bg.className = 'dlmbg'; bg.style.zIndex = 90 + host.children.length * 2;
     bg.innerHTML = '<div class="dlm ' + cls + '" role="dialog" aria-modal="true">' + html + '</div>'; host.appendChild(bg);
+    document.documentElement.classList.add('dlm-lock');   // trava a rolagem da tela enquanto houver modal aberto
     const x = bg.querySelector('[data-dlmx]'); if (x) x.focus();
   }
-  const dlmPop = () => { const host = document.getElementById('dlmHost'); if (host && host.lastElementChild) host.removeChild(host.lastElementChild); };
+  const dlmPop = () => { const host = document.getElementById('dlmHost'); if (host && host.lastElementChild) host.removeChild(host.lastElementChild); if (!host || !host.children.length) document.documentElement.classList.remove('dlm-lock'); };
   function dirLancAbrir(i){ const g = dirDetIdx[i]; if (!g || !g.itens.length) return; if (g.itens.length === 1) dirLancInfo(g.itens[0]); else dirLancLista(g); }
   function dirLancLista(g){
     dlmItens = g.itens.slice().sort((a, b) => String(b.data).localeCompare(String(a.data)) || (+b.valor || 0) - (+a.valor || 0));
