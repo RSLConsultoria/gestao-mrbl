@@ -1,7 +1,7 @@
 // Sincronização das telas com a planilha.
 // As telas carregam tudo ao entrar (dados.carregar) e, a cada ação, mandam só o que mudou (sync.aplicar).
 var ABAS_APP = { Contas: 'contas', Despesas: 'saidas', Entradas: 'entradas', Previsoes: 'previsoes', Fornecedores: 'fornecedores', Clientes: 'clientes', Parcelamentos: 'parcelamentos', Cheques: 'cheques', SaldosBanco: 'saldosBanco', ContasSemData: 'semData' };
-var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto', 'dirMetas', 'dirMetaFat', 'acesso'];
+var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto', 'dirMetas', 'dirMetaFat', 'dirFatDre', 'acesso'];
 // Configurações que só administrador grava.
 var CONFIG_ADMIN = ['acesso'];
 

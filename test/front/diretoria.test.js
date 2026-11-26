@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clienteChave, periodo, lerSemanal } from '../../src/app/diretoria.js';
+import { clienteChave, periodo, lerSemanal, fatComDre } from '../../src/app/diretoria.js';
 import { diferenca, fotografar } from '../../src/app/sync.js';
 
 describe('Diretoria: regras', () => {
@@ -62,5 +62,23 @@ describe('acessos vão para a Config', () => {
     expect(diferenca(f, S).vazio).toBe(true);
     S.acesso.usuarios.Lucca = { perfil: 'adm', mods: null };
     expect(diferenca(f, S).mud.Config.acesso.usuarios.Lucca.perfil).toBe('adm');
+  });
+});
+
+describe('Diretoria: faturamento em R$ vem da DRE, peças da planilha', () => {
+  it('mês com DRE usa o valor da DRE e mantém as peças; mês sem DRE fica com a planilha', () => {
+    const M = { '2025-02': { valor: 100000, qtd: 3000 }, '2025-03': { valor: 90000, qtd: 3100 } };
+    const o = fatComDre(M, { '2025-02': 120000, '2025-04': 130500.5, '2025-05': 0 });
+    expect(o['2025-02']).toEqual({ valor: 120000, qtd: 3000, plan: 100000, dre: true });
+    expect(o['2025-03']).toEqual({ valor: 90000, qtd: 3100, plan: 90000 });
+    expect(o['2025-04'].valor).toBe(130500.5);
+    expect(o['2025-04'].qtd).toBe(0);
+    expect(o['2025-05']).toBeUndefined();
+    expect(M['2025-02'].valor).toBe(100000);
+  });
+  it('o faturamento digitado da DRE vai para a Config', () => {
+    const S = { dirFatDre: null };
+    const f = fotografar(S); S.dirFatDre = { '2026-02': 111111 };
+    expect(diferenca(f, S).mud.Config).toEqual({ dirFatDre: { '2026-02': 111111 } });
   });
 });

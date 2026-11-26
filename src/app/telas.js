@@ -47,7 +47,9 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     user: dados.usuario, logs: dados.logs || [],
     relFoto: CFG.relFoto && typeof CFG.relFoto === 'object' ? CFG.relFoto : null,
     // metas da Diretoria (Configurações › Diretoria); null = padrão do Power BI
-    dirMetas: CFG.dirMetas && typeof CFG.dirMetas === 'object' ? CFG.dirMetas : null, dirMetaFat: CFG.dirMetaFat == null || CFG.dirMetaFat === '' ? null : +CFG.dirMetaFat
+    dirMetas: CFG.dirMetas && typeof CFG.dirMetas === 'object' ? CFG.dirMetas : null, dirMetaFat: CFG.dirMetaFat == null || CFG.dirMetaFat === '' ? null : +CFG.dirMetaFat,
+    // faturamento da DRE por mês digitado em Configurações › Diretoria ({ 'aaaa-mm': valor })
+    dirFatDre: CFG.dirFatDre && typeof CFG.dirFatDre === 'object' ? CFG.dirFatDre : null
   };
   // níveis de acesso (Configurações › Acessos); antes de salvos, administradores com tudo e os demais com Financeiro
   S.acesso = acessoValido(CFG.acesso) ? CFG.acesso : acessoPadrao(S.usuarios, (Array.isArray(CFG.admins) && CFG.admins.length ? CFG.admins : ['Lucca']).concat(dados.admin ? [dados.usuario] : []));

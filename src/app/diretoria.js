@@ -59,6 +59,15 @@ export function lerSemanal(linhas, anoAba){
   return { rows, semData, ign, noBloco };
 }
 
+// Faturamento do mês na Diretoria: R$ da linha FATURAMENTO da DRE quando o mês tem DRE; senão, o da planilha.
+// Peças ficam sempre as da planilha. M = { 'aaaa-mm': { valor, qtd } } da planilha; D = { 'aaaa-mm': valor } da DRE.
+export function fatComDre(M, D){
+  const o = {};
+  Object.keys(M).forEach((mk) => { o[mk] = { valor: M[mk].valor, qtd: M[mk].qtd, plan: M[mk].valor }; });
+  Object.keys(D || {}).forEach((mk) => { if (!(+D[mk] > 0)) return; const m = o[mk] = o[mk] || { valor: 0, qtd: 0, plan: 0 }; m.valor = +D[mk]; m.dre = true; });
+  return o;
+}
+
 export function criarDiretoria(ctx){
   const { view, render, act, toast, api, esc, money, num, pad, cap, MESES, MES3, mesNome, mAdd, CUR, cellVal, normTxt } = ctx;
   const ANO = +CUR.slice(0, 4);
@@ -145,7 +154,21 @@ export function criarDiretoria(ctx){
     if (!fatCache) fatCache = FAT.filter((r) => /^\d{4}-\d\d-\d\d/.test(String(r.data || ''))).map((r) => ({ data: String(r.data).slice(0, 10), os: String(r.os == null ? '' : r.os), cli: r.cli == null ? '' : String(r.cli), k: dirCliK(r.cli), qtd: +r.qtd || 0, valor: +r.valor || 0 }));
     return fatCache;
   }
-  function dirFatMes(rows){ const M = {}; rows.forEach((r) => { const m = M[r.data.slice(0, 7)] = M[r.data.slice(0, 7)] || { valor: 0, qtd: 0 }; m.valor += r.valor; m.qtd += r.qtd; }); return M; }
+  // por mês: valor e peças da planilha. Com dre = true (empresa toda), o valor em R$ passa a ser a linha
+  // FATURAMENTO da DRE (consolidado dos CNPJs, já com devoluções e refaturamentos); mês sem DRE fica com a planilha.
+  // As peças são sempre as da planilha.
+  function dirFatMes(rows, dre){
+    const M = {}; rows.forEach((r) => { const m = M[r.data.slice(0, 7)] = M[r.data.slice(0, 7)] || { valor: 0, qtd: 0 }; m.valor += r.valor; m.qtd += r.qtd; });
+    return dre === 'todos' || (dre && !dirV().clis.length) ? fatComDre(M, dirFatDre()) : M;
+  }
+  // linha FATURAMENTO da DRE por mês: anos fechados vêm do histórico importado (DreHistorico);
+  // os demais, do que foi digitado em Configurações › Diretoria (que também corrige o histórico, se preciso).
+  function dirFatDre(){
+    const o = {};
+    [ANO - 2, ANO - 1, ANO].forEach((a) => { if (a === ctx.DRE_ANO) return; const H = ctx.histAno(a); if (!H || !H.fat) return; H.fat.forEach((v, i) => { if (v) o[a + '-' + pad(i + 1)] = v; }); });
+    const c = S.dirFatDre || {}; Object.keys(c).forEach((mk) => { if (/^\d{4}-\d\d$/.test(mk) && +c[mk] > 0) o[mk] = +c[mk]; });
+    return o;
+  }
   // meta de faturamento: o mesmo valor todo mês (Configurações › Diretoria); com filtro de cliente não se aplica
   const dirMeta = () => dirV().clis.length ? 0 : metaFat();
 
@@ -312,7 +335,7 @@ export function criarDiretoria(ctx){
 
   // ================= 1. RESULTADO =================
   function dirRenderRes(){
-    const P = dirPer(), ano = P.ano, rows = dirFat(), FM = dirFatMes(rows);
+    const P = dirPer(), ano = P.ano, rows = dirFat(), FM = dirFatMes(rows, true);
     const fv = (ms) => dirSum(ms.map((mk) => (FM[mk] || {}).valor)), fq = (ms) => dirSum(ms.map((mk) => (FM[mk] || {}).qtd));
     const msC = P.ms.filter((mk) => FM[mk]), nMed = (ms) => ms.filter((mk) => FM[mk] && FM[mk].valor).length || 1;
     const fat = fv(P.ms), fatA = fv(P.prev), q = fq(P.ms), qA = fq(P.prev);
@@ -348,13 +371,14 @@ export function criarDiretoria(ctx){
     h += '<div class="drow2"><section class="panel dblk dres rc"><h3>Faturamento</h3><div class="dbn3">' + kF + '</div></section>' +
       '<section class="panel dblk dres rs"><h3>Produção</h3><div class="dbn3">' + kP + '</div></section></div>';
     h += '<div class="drow2">' + gF + gP + '</div>';
-    h += '<p class="dnota">Faturamento em R$ e peças vêm da planilha do faturamento (abas SEMANAL), importada em Configurações › Diretoria. Ticket médio = valor faturado ÷ peças faturadas.</p>';
+    h += '<p class="dnota">' + (dirV().clis.length ? 'Com cliente escolhido, o faturamento em R$ é o da planilha do faturamento (a DRE não separa por cliente).' : 'Faturamento em R$ = linha FATURAMENTO da DRE (consolidado dos CNPJs, com devoluções e refaturamentos), em Configurações › Diretoria; mês ainda sem DRE usa a planilha do faturamento.') +
+      ' Peças vêm sempre da planilha do faturamento (abas SEMANAL). Ticket médio = faturado ÷ peças faturadas.</p>';
     return h;
   }
 
   // ================= 3. DESPESAS =================
   function dirRenderDesp(){
-    const P = dirPer(), ano = P.ano, Dp = dirDesp(), V = dirV(), FM = dirFatMes(dirFat(false));
+    const P = dirPer(), ano = P.ano, Dp = dirDesp(), V = dirV(), FM = dirFatMes(dirFat(false), 'todos');
     if (!V.desp) V.desp = [];
     const sel = V.desp, um = sel.length === 1 ? sel[0] : null;
     const somaG = (ms) => { const t = {}; ms.forEach((mk) => Object.entries(Dp.G[mk] || {}).forEach(([k, v]) => { t[k] = (t[k] || 0) + v; })); return t; };
@@ -510,8 +534,30 @@ export function criarDiretoria(ctx){
       '<div class="dmetas"><label class="ff dmf"><span>Meta de faturamento (R$ por mês, igual em todos os meses)</span><input id="dMetaFat" inputmode="decimal" value="' + num(metaFat()) + '"></label>' +
       '<table class="ptab dtab"><thead><tr><th>Grupo de despesa</th><th class="r">Meta (% do faturamento)</th></tr></thead><tbody>' +
       DIR_GRP.map(([k, n]) => '<tr><td>' + esc(n) + '<small>' + esc(k) + '</small></td><td class="r"><input class="dmi" data-dmeta="' + esc(k) + '" inputmode="decimal" value="' + (mt[k] ? String(mt[k]).replace('.', ',') : '') + '" placeholder="sem meta" aria-label="Meta de ' + esc(n) + '"> %</td></tr>').join('') + '</tbody></table></div></section>';
+    h += cfgFatDre(M);
     h += '<section class="panel"><div class="ph"><div><h2>Histórico do Fluxo de Caixa ' + (ANO - 1) + '</h2><small class="dsub">' + (h25 ? 'Carregado. ' : 'Ainda não importado. ') + 'Recebimentos e despesas de ' + (ANO - 1) + ' usados na comparação de Diretoria › Despesas.</small></div></div></section></div>';
     return h;
+  }
+  // Faturamento da DRE: o valor em R$ que a Diretoria usa. Ano com DRE importada (histórico) aparece pronto;
+  // nos outros, digita-se o FATURAMENTO de cada mês fechado. Mês em branco usa a planilha do faturamento.
+  function cfgFatDre(M){
+    const c = S.dirFatDre || {}, hist = {};
+    [ANO - 1, ANO].forEach((a) => { if (a === ctx.DRE_ANO) return; const H = ctx.histAno(a); if (H && H.fat) H.fat.forEach((v, i) => { if (v) hist[a + '-' + pad(i + 1)] = v; }); });
+    const linhas = [];
+    [ANO - 1, ANO].forEach((a) => { for (let i = 0; i < 12; i++) { const mk = a + '-' + pad(i + 1); if (mk > CUR) break; linhas.push(mk); } });
+    let difT = 0;
+    const tr = linhas.map((mk) => {
+      const plan = (M[mk] || {}).valor || 0, dig = +c[mk] > 0 ? +c[mk] : null, h = hist[mk] || null, dre = dig != null ? dig : h, dif = dre != null && plan ? dre - plan : null;
+      if (dif != null) difT += dif;
+      // mês com DRE importada (histórico) aparece pronto, sem campo; os outros meses recebem o valor digitado
+      const campo = h && dig == null ? '<span class="num">' + money(h) + '</span><small>DRE ' + mk.slice(0, 4) + ' importada</small>' :
+        '<input class="dmi dfd" data-dfatdre="' + mk + '" inputmode="decimal" value="' + (dig != null ? num(dig) : '') + '" placeholder="' + (mk === CUR ? 'em andamento' : 'usa a planilha') + '" aria-label="Faturamento da DRE em ' + dirMk(mk) + '">';
+      return '<tr><td>' + cap(mesNome(mk)) + ' ' + mk.slice(0, 4) + '</td><td class="r num">' + (plan ? money(plan) : '—') + '</td><td class="r">' + campo + '</td><td class="r num">' + (dif == null ? '—' : (dif < 0 ? '−' : dif > 0 ? '+' : '') + money(Math.abs(dif))) + '</td></tr>';
+    }).join('');
+    return '<section class="panel"><div class="ph"><div><h2>Faturamento da DRE</h2><small class="dsub">O faturamento em R$ da Diretoria é a linha FATURAMENTO da DRE: consolida os CNPJs e já considera devoluções e refaturamentos. As peças continuam vindo da planilha do faturamento. ' +
+      'Os anos com DRE importada já aparecem; nos outros, digite o faturamento de cada mês fechado. Mês em branco usa o valor da planilha.</small></div><button type="button" class="btn sm pri" data-dcfg="fatdre">Salvar faturamento</button></div>' +
+      '<div class="pscroll"><table class="ptab dtab dfdt"><thead><tr><th>Mês</th><th class="r">Planilha do faturamento</th><th class="r">DRE (o que vale)</th><th class="r">DRE − planilha</th></tr></thead><tbody>' + tr + '</tbody>' +
+      '<tfoot><tr class="totrow"><td>Diferença nos meses com DRE</td><td></td><td></td><td class="r num">' + (difT < 0 ? '−' : difT > 0 ? '+' : '') + money(Math.abs(difT)) + '</td></tr></tfoot></table></div></section>';
   }
   async function dirLerExcel(file){
     await ctx.carregarExcel();
@@ -633,6 +679,12 @@ export function criarDiretoria(ctx){
       const mf = nv(document.getElementById('dMetaFat').value); if (mf == null || mf < 0) { toast('A meta de faturamento não está certa.', false); return; }
       const ms = {}; document.querySelectorAll('[data-dmeta]').forEach((i) => { const x = parseFloat(String(i.value || '').replace(',', '.')); ms[i.dataset.dmeta] = isFinite(x) && x > 0 ? x : 0; });
       act('Metas da Diretoria salvas.', () => { const s = ctx.getS(); s.dirMetaFat = mf; s.dirMetas = ms; }); return;
+    }
+    if (dc && dc.dataset.dcfg === 'fatdre') {
+      const o = {}; let ruim = null;
+      document.querySelectorAll('[data-dfatdre]').forEach((i) => { const t0 = String(i.value || '').trim(); if (!t0) return; const x = parseFloat(t0.replace(/R\$|\s/g, '').replace(/\./g, '').replace(',', '.')); if (!isFinite(x) || x <= 0) { ruim = ruim || i.dataset.dfatdre; return; } o[i.dataset.dfatdre] = Math.round(x * 100) / 100; });
+      if (ruim) { toast('O faturamento de ' + dirMk(ruim) + ' não está certo.', false); return; }
+      act('Faturamento da DRE salvo (' + Object.keys(o).length + (Object.keys(o).length === 1 ? ' mês' : ' meses') + ').', () => { ctx.getS().dirFatDre = o; }); return;
     }
     if (t.id === 'dirImpOk') {
       const I = view.dirImp; if (!I || I.enviando) return;
