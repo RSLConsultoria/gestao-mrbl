@@ -1,7 +1,10 @@
 // Sincronização das telas com a planilha.
 // As telas carregam tudo ao entrar (dados.carregar) e, a cada ação, mandam só o que mudou (sync.aplicar).
-var ABAS_APP = { Contas: 'contas', Despesas: 'saidas', Entradas: 'entradas', Previsoes: 'previsoes', Fornecedores: 'fornecedores', Clientes: 'clientes', Parcelamentos: 'parcelamentos', Cheques: 'cheques', SaldosBanco: 'saldosBanco', ContasSemData: 'semData' };
-var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto', 'dirMetas', 'dirMetaFat', 'dirFatDre', 'acesso'];
+var ABAS_APP = { Contas: 'contas', Despesas: 'saidas', Entradas: 'entradas', Previsoes: 'previsoes', Fornecedores: 'fornecedores', Clientes: 'clientes', Parcelamentos: 'parcelamentos', Cheques: 'cheques', SaldosBanco: 'saldosBanco', ContasSemData: 'semData', Colaboradores: 'colaboradores' };
+// Abas e configurações do RH (salários): só vão para quem tem o módulo RH (ou é administrador), e só essas pessoas gravam.
+var ABAS_RH = ['Colaboradores'];
+var CONFIG_RH = ['rhCfg', 'rhOrgPos'];
+var CONFIG_EDITAVEL = ['prazoOficinas', 'prevRevisao', 'oficinasFixas', 'relFoto', 'dirMetas', 'dirMetaFat', 'dirFatDre', 'acesso', 'rhCfg', 'rhOrgPos'];
 // Configurações que só administrador grava.
 var CONFIG_ADMIN = ['acesso'];
 
@@ -50,11 +53,21 @@ var Sync = {
     var p = ac.perfis.filter(function (q) { return q.id === x.perfil; })[0];
     return p && Array.isArray(p.mods) ? p.mods : [];
   },
+  // Quem vê e grava o RH: administrador ou quem tem o módulo "rh" nos acessos.
+  podeRh: function (usuario) {
+    if (Sync.admins().indexOf(usuario) >= 0) return true;
+    var ac = Sync.config().acesso;
+    return !!(ac && ac.usuarios && Array.isArray(ac.perfis) && Sync.modsDe_(ac, usuario).indexOf('rh') >= 0);
+  },
   carregar: function (sess) {
     var out = { usuario: sess.usuario, hoje: hoje_(), config: Sync.config() };
+    var rh = Sync.podeRh(sess.usuario);
     Object.keys(ABAS_APP).forEach(function (aba) {
+      if (ABAS_RH.indexOf(aba) >= 0 && !rh) return;
       out[ABAS_APP[aba]] = Db.todos(aba).map(function (r) { return Sync.doLinha(aba, r); });
     });
+    if (!rh) CONFIG_RH.forEach(function (k) { delete out.config[k]; });
+    out.rh = rh;
     out.dreHistorico = Db.todos('DreHistorico');
     out.fatHistorico = Db.todos('FatHistorico');
     var admin = Sync.admins().indexOf(sess.usuario) >= 0;
@@ -74,6 +87,8 @@ var Sync = {
     Object.keys(mud).forEach(function (aba) {
       if (aba !== 'Config' && !ABAS_APP[aba]) throw Auth.erro('aba_proibida', 'O app não pode gravar na aba ' + aba + '.');
     });
+    var mexeRh = ABAS_RH.some(function (a) { return !!mud[a]; }) || (mud.Config && CONFIG_RH.some(function (k) { return Object.prototype.hasOwnProperty.call(mud.Config, k); }));
+    if (mexeRh && !Sync.podeRh(sess.usuario)) throw Auth.erro('sem_permissao', 'Só quem tem acesso ao RH pode mexer nos colaboradores.');
     return mutar_(sess, d.tela || '', function () {
       var agora = agora_(), novosClientes = {};
       Object.keys(ABAS_APP).forEach(function (aba) {
@@ -94,6 +109,7 @@ var Sync = {
           if (aba === 'Parcelamentos' || aba === 'Cheques') r.criadoEm = antes ? antes.criadoEm : agora;
           if (aba === 'SaldosBanco') { r.em = agora; r.por = sess.usuario; }
           if (aba === 'ContasSemData') { r.criadoEm = antes ? antes.criadoEm : agora; r.criadoPor = antes ? antes.criadoPor : sess.usuario; }
+          if (aba === 'Colaboradores') r.criadoEm = antes ? antes.criadoEm : agora;
           if (aba === 'Contas') { r.criadoEm = antes ? antes.criadoEm : agora; r.criadoPor = antes ? antes.criadoPor : sess.usuario; }
           return r;
         });

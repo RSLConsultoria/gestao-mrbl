@@ -17,6 +17,8 @@ var SCHEMA = {
   ContasSemData: ['id', 'forn', 'cat', 'sub', 'valor', 'obs', 'log', 'extra', 'criadoEm', 'criadoPor'],
   // base de faturamento da Diretoria (linhas de NF das abas SEMANAL da planilha de faturamento), importada por mês
   FatHistorico: ['data', 'os', 'cli', 'canal', 'prod', 'corte', 'vUnit', 'qtd', 'valor', 'nf'],
+  // RH: uma linha por colaborador (planilha "Geral colaboradores" importada em Configurações › RH). Só quem tem o módulo RH lê e grava.
+  Colaboradores: ['id', 'nome', 'apel', 'loc', 'adm', 'fn', 'setor', 'lid', 'sal', 'pr', 'vinc', 'pa', 'prov', 'sit', 'ate', 'nota', 'log', 'extra', 'criadoEm'],
   Clientes: ['nome'],
   Config: ['chave', 'valor'],
   Logs: ['em', 'por', 'tela', 'txt']
@@ -30,9 +32,9 @@ var CHAVES = { Usuarios: 'nome', Sessoes: 'token', Clientes: 'nome', Config: 'ch
 function chaveDe_(aba) { return Object.prototype.hasOwnProperty.call(CHAVES, aba) ? CHAVES[aba] : 'id'; }
 
 // Colunas guardadas como texto (datas aaaa-mm-dd e ids), para a planilha não converter.
-var COLUNAS_TEXTO = ['id', 'data', 'orig', 'pagoEm', 'dreId', 'entrega', 'recebidoEm', 'criadoEm', 'contaId', 'em', 'mes', 'token', 'nf', 'convite', 'forn', 'nome', 'cli', 'obs', 'chave', 'numero', 'banco', 'por', 'os', 'canal', 'prod'];
+var COLUNAS_TEXTO = ['id', 'data', 'orig', 'pagoEm', 'dreId', 'entrega', 'recebidoEm', 'criadoEm', 'contaId', 'em', 'mes', 'token', 'nf', 'convite', 'forn', 'nome', 'cli', 'obs', 'chave', 'numero', 'banco', 'por', 'os', 'canal', 'prod', 'apel', 'loc', 'adm', 'fn', 'setor', 'lid', 'vinc', 'pa', 'sit', 'ate', 'nota'];
 // Colunas com listas ou objetos, guardadas como JSON.
-var COLUNAS_JSON = ['hist', 'histEnt', 'log', 'subs', 'extra'];
+var COLUNAS_JSON = ['hist', 'histEnt', 'log', 'subs', 'extra', 'prov'];
 
 // Cria as abas que faltam com o cabeçalho, sem apagar dado nenhum. Rode pelo editor do Apps Script.
 function setupPlanilha() {

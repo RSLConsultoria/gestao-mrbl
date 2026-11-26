@@ -1,8 +1,8 @@
 // Grava na planilha só o que mudou. Guarda uma "fotografia" do estado depois de cada gravação e,
 // na próxima, compara registro a registro pelo id. As gravações saem em fila, na ordem em que foram feitas.
-export const COLECOES = { contas: 'Contas', saidas: 'Despesas', entradas: 'Entradas', previsoes: 'Previsoes', fornecedores: 'Fornecedores', parcelamentos: 'Parcelamentos', cheques: 'Cheques', saldosBanco: 'SaldosBanco', semData: 'ContasSemData' };
+export const COLECOES = { contas: 'Contas', saidas: 'Despesas', entradas: 'Entradas', previsoes: 'Previsoes', fornecedores: 'Fornecedores', parcelamentos: 'Parcelamentos', cheques: 'Cheques', saldosBanco: 'SaldosBanco', semData: 'ContasSemData', colaboradores: 'Colaboradores' };
 
-const configDe = (S) => ({ prazoOficinas: S.prazoOf, prevRevisao: JSON.stringify(S.prevReview || {}), oficinasFixas: JSON.stringify(S.ofFixas || []), relFoto: JSON.stringify(S.relFoto || null), dirMetas: JSON.stringify(S.dirMetas || null), dirMetaFat: S.dirMetaFat == null ? null : S.dirMetaFat, dirFatDre: JSON.stringify(S.dirFatDre || null), acesso: JSON.stringify(S.acesso || null) });
+const configDe = (S) => ({ prazoOficinas: S.prazoOf, prevRevisao: JSON.stringify(S.prevReview || {}), oficinasFixas: JSON.stringify(S.ofFixas || []), relFoto: JSON.stringify(S.relFoto || null), dirMetas: JSON.stringify(S.dirMetas || null), dirMetaFat: S.dirMetaFat == null ? null : S.dirMetaFat, dirFatDre: JSON.stringify(S.dirFatDre || null), acesso: JSON.stringify(S.acesso || null), rhCfg: JSON.stringify(S.rhCfg || null), rhOrgPos: JSON.stringify(S.rhOrgPos || null) });
 
 export function fotografar(S) {
   const f = {};
@@ -34,6 +34,8 @@ export function diferenca(antes, S) {
   if (cAnt.dirMetaFat !== cNovo.dirMetaFat && S.dirMetaFat != null) cfg.dirMetaFat = cNovo.dirMetaFat;
   if (cAnt.dirFatDre !== cNovo.dirFatDre && S.dirFatDre) cfg.dirFatDre = JSON.parse(cNovo.dirFatDre);
   if (cAnt.acesso !== cNovo.acesso && S.acesso) cfg.acesso = JSON.parse(cNovo.acesso);
+  if (cAnt.rhCfg !== cNovo.rhCfg && S.rhCfg) cfg.rhCfg = JSON.parse(cNovo.rhCfg);
+  if (cAnt.rhOrgPos !== cNovo.rhOrgPos && S.rhOrgPos) cfg.rhOrgPos = JSON.parse(cNovo.rhOrgPos);
   if (Object.keys(cfg).length) { mud.Config = cfg; vazio = false; }
   return { mud, vazio };
 }

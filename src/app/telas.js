@@ -3,7 +3,8 @@
 /* eslint-disable */
 import { lerFluxoConsolidado } from './historico.js';
 import { criarDiretoria, DIR_TELAS, DIR_TITULO } from './diretoria.js';
-import { AC_MODS, AC_TELAS, acModNome, acessoPadrao, acessoValido, modsDe, telasDe, comCfg } from './acessos.js';
+import { criarRh, RH_TELAS, RH_TITULO } from './rh.js';
+import { AC_MODS, AC_TELAS, acModNome, acessoPadrao, acessoValido, modsDe, telasDe, comCfg, comRh } from './acessos.js';
 const LISTAS = {"DESPESAS COM FUNCIONARIOS": ["SALARIOS", "SALARIOS PJ", "PLANO DE SAUDE", "CONVENIOS FARMACIA / LOJA", "PREMIO", "REEMBOLSO", "RESCISÃO", "ACORDO TRABALHISTA", "UNIFORME/SAPATOS/EPI", "FERIAS", "VALE ALIMETAÇÃO/ VALE REFEIÇÃO", "SEGURO DE VIDA", "PENSÃO", "EMPRESTIMOS", "HORAS EXTRAS", "VALE TRANSPORTE", "CURSOS/ TREINAMENTOS", "OUTRAS DIVERSAS RH (ALIMENTAÇÃO)", "ATESTADO MEDICO ADMIS / DEMISSIONAL /EXAME MEDICO", "13 SALARIO"], "ENCARGOS SOCIAIS": ["INSS / GPS", "IRRF", "IRRF ( PARCELAMENTO)", "DARF", "GRRF", "SINDICATO / ISS", "FGTS (PARCELAMENTO)", "FGTS"], "DESPESAS COM UTILITARIOS E SERVIÇOS": ["AGUA E ESGOTO", "ENERGIA ELETRICA", "TELEFONE FIXO", "TELEFONE CELULAR", "INTERNET", "OUTROS / DIVERSOS"], "DESPESAS TRIBUTARIAS FEDERAIS": ["PIS", "COFINS", "IRPJ", "CSSLL", "DAS", "IPI", "DAE", "ICMS", "PARCELAMENTO ICMS"], "DESPESAS TRIBUTARIAS MUNICIPAIS": ["IPTU (OUTRAS TAXAS EM GERAL)"], "DESPESAS COM VENDAS E MKT": ["PATROCINIO", "PROPAGANDA/MARKETING", "VEICULOS DE COMUNICAÇÃO", "BONIFICAÇÃO PARA PARCEIROS", "CONSULTAS DE CREDITO (SERASA)", "COMISSOES/GRATIFICAÇÕES", "ASSOCIAÇÕES E SINDICATOS", "OUTRAS"], "DESPESAS ADMINISTRATIVA": ["MATERIAL DE ESCRITORIO", "CARTÃO DE CREDITO", "CORREIO", "MOTOTAXI / ENTREGAS RAPIDAS", "CONSULTORIA/ADVOGADOS", "CONTABILIDADE", "CAIXA INTERNO", "COMPRA EQUIPAMENTOS / MOVÉIS E UTENSÍLIOS", "MANUTENÇÃO DE MÁQUINAS", "MATERIAL USO CONSUMO", "MATERIAL DE EMBALAGENS", "INFORMATICA/SISTEMA", "RECRUTAMENTO ( PUPLICAÇÃO VAGA EMPREGO)", "DESPESA DE VIAGEM / HOSPEDAGEM / CONDOMINIO", "SEM PARAR", "SEGURO EMPRESA", "TAXAS DIVERSAS (CARTORIO)", "ALARME MONITORADO/SEGURANÇA", "LIMPEZA EM GERAL", "TAXAS DIVERSAS"], "ACESSORIAS": ["ACESSORIAS EM GERAL (OF)", "ACESSORIAS EM GERAL (OF) SN", "TERCEIRIZADOS (PJ)", "PASSIVOS DIVERSOS (CO/ST)"], "MANUTENCAO PREDIAL": ["MATERIAIS P/ CONSTRUÇÃO E FERRAMENTAS", "COLETA DE RESIDUOS", "ELEVADOR"], "PREJUIZOS": ["USO E CONSUMO", "PERDAS EM GERAL"], "DESPESAS FINANCEIRAS": ["CAPITALIZAÇÃO E SEGUROS", "TARIFA DIVERSAS + JUROS", "AMORTIZAÇÃO CONTA GARANTIA", "DEVOLUÇÕES DUPLICIDADE TÍTULOS", "ESTORNO", "TAXA DE ANTECIPAÇÃO DE RECEBIVEIS", "PROFINANCE ( EMPRESTIMO)", "TRANSFERENCIA"], "FINANCIAMENTOS": ["FINANCIAMENTO BNDES / PRONAMPE", "CONSÓRCIO / EMPRÉSTIMOS", "VEICULOS E OUTROS"], "PRÓ-LABORE": ["DIRETORIA", "INVESTIMENTOS PESSOAIS"], "AQUISIÇÕES / INVESTIMENTOS": ["COMPRA DE MAQUINAS", "ANIMALE ( EMPRESTIMO SEDA )", "CONSTRUÇÃO EM ANDAMENTO"], "MANUTENÇAO VEICULAR": ["TRIBUTOS (IPVA / LICENCIAMENTO / OUTROS / MULTAS )", "SEGURO CARRO", "COMBUSTÍVEL", "MANUTENÇÃO / PEÇAS DE VEÍCULOS"], "PROVISAO": ["FESTA FINAL DE ANO", "13º SALARIO", "FÉRIAS"], "ALUGUEL": ["ALUGUEL"], "FORNECEDORES (CMV)": ["FORNECEDORES"], "FRETE": ["FRETE"]};
 const EMPS = ["MRBL", "STOFFA"];
 const ECATS = ["RECEBIMENTO DE CLIENTE", "DEVOLUÇÃO", "RECEBIMENTO MRBL", "RECEBIMENTO STOFFA", "EMPRÉSTIMO PROFINANCE", "ANTECIPAÇÃO"];
@@ -49,10 +50,14 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     // metas da Diretoria (Configurações › Diretoria); null = padrão do Power BI
     dirMetas: CFG.dirMetas && typeof CFG.dirMetas === 'object' ? CFG.dirMetas : null, dirMetaFat: CFG.dirMetaFat == null || CFG.dirMetaFat === '' ? null : +CFG.dirMetaFat,
     // faturamento da DRE por mês digitado em Configurações › Diretoria ({ 'aaaa-mm': valor })
-    dirFatDre: CFG.dirFatDre && typeof CFG.dirFatDre === 'object' ? CFG.dirFatDre : null
+    dirFatDre: CFG.dirFatDre && typeof CFG.dirFatDre === 'object' ? CFG.dirFatDre : null,
+    // RH: o servidor só manda para quem tem o módulo RH (dados.rh)
+    colaboradores: dados.rh ? (dados.colaboradores || []) : undefined,
+    rhCfg: dados.rh && CFG.rhCfg && typeof CFG.rhCfg === 'object' ? CFG.rhCfg : null,
+    rhOrgPos: dados.rh && CFG.rhOrgPos && typeof CFG.rhOrgPos === 'object' ? CFG.rhOrgPos : null
   };
   // níveis de acesso (Configurações › Acessos); antes de salvos, administradores com tudo e os demais com Financeiro
-  S.acesso = acessoValido(CFG.acesso) ? CFG.acesso : acessoPadrao(S.usuarios, (Array.isArray(CFG.admins) && CFG.admins.length ? CFG.admins : ['Lucca']).concat(dados.admin ? [dados.usuario] : []));
+  S.acesso = acessoValido(CFG.acesso) ? comRh(CFG.acesso) : acessoPadrao(S.usuarios, (Array.isArray(CFG.admins) && CFG.admins.length ? CFG.admins : ['Lucca']).concat(dados.admin ? [dados.usuario] : []));
   S.previsoes.forEach((p) => { if (!Array.isArray(p.subs)) p.subs = p.subs ? String(p.subs).split(';').map((x) => x.trim()).filter(Boolean) : []; });
   S.contas.forEach((c) => { if (!c.hist) c.hist = c.orig && c.orig !== c.data ? [{ de: c.orig, para: c.data, em: null }] : []; });
   const OFSUBS = [OF, OFSN];
@@ -272,6 +277,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (!view.modal) return '';
     if (view.modal === 'pvimp') return pvImpHTML();
     if (view.modal === 'dir:imp') return DIR.modal();
+    if (/^rh:/.test(view.modal)) return RH.modal();
     if (view.modal === 'lanc') return lancModalHTML();
     if (view.modal === 'parcnew' || view.modal === 'parcedit') return parcModalHTML();
     if (view.modal === 'sd') return sdModalHTML();
@@ -939,7 +945,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     try { renderCore(); }
     catch (err) {
       console.error(err);
-      document.getElementById('app').innerHTML = '<div class="today"><h1>' + esc(({ pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório de despesas', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações', ...DIR_TITULO })[view.tela] || '') + '</h1></div><section class="panel" style="padding:18px;border-color:var(--danger)"><b style="color:var(--danger-ink)">Esta tela não abriu.</b><p style="margin:6px 0;color:var(--muted);font-size:14px">Recarregue a página. Se continuar, mande um print desta mensagem para o Lucca. Detalhe técnico: <code>' + esc(String(err && err.message || err)) + '</code></p><button type="button" class="btn" onclick="location.reload()">Recarregar</button></section>';
+      document.getElementById('app').innerHTML = '<div class="today"><h1>' + esc(({ pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório de despesas', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações', ...DIR_TITULO, ...RH_TITULO })[view.tela] || '') + '</h1></div><section class="panel" style="padding:18px;border-color:var(--danger)"><b style="color:var(--danger-ink)">Esta tela não abriu.</b><p style="margin:6px 0;color:var(--muted);font-size:14px">Recarregue a página. Se continuar, mande um print desta mensagem para o Lucca. Detalhe técnico: <code>' + esc(String(err && err.message || err)) + '</code></p><button type="button" class="btn" onclick="location.reload()">Recarregar</button></section>';
     }
     { const tt = document.getElementById('topTitle'); const td = document.querySelector('#app > .today'); tt.innerHTML = ''; if (td) tt.appendChild(td); }
     document.getElementById('modalHost').innerHTML = modalHTML();
@@ -954,10 +960,11 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     document.getElementById('btnNew').textContent = view.tela === 'of' ? '+ Nova entrega' : view.tela === 'parc' ? '+ Novo parcelamento' : '+ Nova conta';
     { const gs = document.getElementById('gSearch'); if (gs) gs.placeholder = view.tela === 'of' ? 'Buscar oficina' : 'Buscar fornecedor ou categoria'; }
     { const ub = document.getElementById('userBox'); if (ub) ub.innerHTML = 'Conectado como<span class="ub-name">' + esc(S.user) + '</span><button type="button" class="ub-out" id="btnSair">Sair</button>'; }
-    document.getElementById('btnNew').hidden = ['pr','rel','dre','drel','cfg'].includes(view.tela) || DIR_TELAS.includes(view.tela);
-    // Diretoria: cantos retos e sem a busca de contas no topo
-    document.body.classList.toggle('dirx', DIR_TELAS.includes(view.tela));
-    { const gb = document.querySelector('#topBar .gsearch'); if (gb) gb.hidden = DIR_TELAS.includes(view.tela); }
+    document.getElementById('btnNew').hidden = ['pr','rel','dre','drel','cfg'].includes(view.tela) || DIR_TELAS.includes(view.tela) || RH_TELAS.includes(view.tela);
+    // Diretoria e RH: cantos retos e sem a busca de contas no topo
+    document.body.classList.toggle('dirx', DIR_TELAS.includes(view.tela) || RH_TELAS.includes(view.tela));
+    document.body.classList.toggle('rhx', RH_TELAS.includes(view.tela) || /^rh:/.test(view.modal || ''));
+    { const gb = document.querySelector('#topBar .gsearch'); if (gb) gb.hidden = DIR_TELAS.includes(view.tela) || RH_TELAS.includes(view.tela); }
     document.getElementById('btnPdf').hidden = view.tela !== 'rel';
     document.getElementById('btnXls').hidden = view.tela !== 'dre' && view.tela !== 'drel';
     if (view.tela === 'parc') return renderParc();
@@ -968,6 +975,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     if (view.tela === 'drel') return renderDrel();
     if (view.tela === 'cfg') return renderCfg();
     if (DIR_TELAS.includes(view.tela)) { document.getElementById('app').innerHTML = DIR.render(); return; }
+    if (RH_TELAS.includes(view.tela)) { RH.render(); return; }
     const app = document.getElementById('app');
     // oficina que ainda não chegou fica só na tela Oficinas; entra em Contas a pagar quando chega (ou se já foi paga)
     const CP = S.contas.filter(naPagar);
@@ -1135,12 +1143,12 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const app = document.getElementById('app');
     // abas por módulo: Minha conta para todos; Listas e Previsões com Financeiro; Diretoria com Diretoria; Acessos e Usuários só administrador
     const m = modsDe(S.acesso, S.user), adm = m.includes('cfg');
-    const abas = [['conta', 'Minha conta', true], ['listas', 'Listas de fornecedores', adm || m.includes('fin')], ['prev', 'Previsões', adm || m.includes('fin')], ['ac', 'Acessos', adm], ['dir', 'Diretoria', adm || m.includes('dir')], ['logs', 'Usuários e logs', adm]].filter((x) => x[2]);
+    const abas = [['conta', 'Minha conta', true], ['listas', 'Listas de fornecedores', adm || m.includes('fin')], ['prev', 'Previsões', adm || m.includes('fin')], ['ac', 'Acessos', adm], ['dir', 'Diretoria', adm || m.includes('dir')], ['rh', 'RH', !!S.colaboradores && (adm || m.includes('rh'))], ['logs', 'Usuários e logs', adm]].filter((x) => x[2]);
     if (!abas.some((x) => x[0] === view.cfgTab)) view.cfgTab = abas.some((x) => x[0] === 'listas') ? 'listas' : abas[0][0];
     const tab = view.cfgTab;
     let h = '<div class="today"><h1>Configurações</h1></div>';
     h += '<div class="seg" role="tablist" aria-label="Seções">' + abas.map(([k, n]) => '<button type="button" role="tab" data-cfgtab="' + k + '" aria-selected="' + (tab === k) + '">' + n + (k === 'prev' && reviewPending() ? ' <i class="dotp" title="Revisão pendente"></i>' : '') + '</button>').join('') + '</div>';
-    h += tab === 'prev' ? cfgPrev() : tab === 'logs' ? cfgLogs() : tab === 'conta' ? cfgConta() : tab === 'ac' ? cfgAcessos() : tab === 'dir' ? DIR.cfg() : cfgListas();
+    h += tab === 'prev' ? cfgPrev() : tab === 'logs' ? cfgLogs() : tab === 'conta' ? cfgConta() : tab === 'ac' ? cfgAcessos() : tab === 'dir' ? DIR.cfg() : tab === 'rh' ? RH.cfg() : cfgListas();
     app.innerHTML = h;
   }
   function cfgListas(){
@@ -1163,7 +1171,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
     const us = S.usuarios, f = view.logUser || '', q = (view.logQ || '').trim().toUpperCase();
     const L = (S.logs || []).filter((x) => (!f || x.por === f) && (!q || x.txt.toUpperCase().includes(q)));
     const nPg = Math.max(1, Math.ceil(L.length / 15)); const pg = Math.min(view.logPg || 0, nPg - 1); view.logPg = pg;
-    const TELA = { pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório de despesas', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações', login: 'Login', dir: 'Diretoria', ...DIR_TITULO };
+    const TELA = { pagar: 'Contas a pagar', of: 'Oficinas', parc: 'Parcelamentos', pr: 'Prorrogadas', rel: 'Relatório de despesas', dre: 'Fluxo de Caixa', drel: 'Lançamentos de Caixa', cfg: 'Configurações', login: 'Login', dir: 'Diretoria', ...DIR_TITULO, rho: 'RH › Organograma', rhc: 'RH › Custos', rhp: 'RH › Colaboradores' };
     let h = '<div class="lgrid"><section class="panel lpane"><div class="lhead"><div><h2>Usuários</h2><small>Quem está logado: <b>' + esc(S.user) + '</b>. Cada um entra com a própria senha.</small></div></div><table class="ltab utab"><tbody>' +
       us.map((u) => '<tr><td title="' + esc(u) + '">' + esc(u) + '</td><td class="r">' + (S.senhas && S.senhas[u] ? (ADMIN ? '<button type="button" class="btn sm" data-resetpw="' + esc(u) + '" title="Apaga a senha e gera um código de convite. A pessoa cria outra senha com esse código.">Redefinir senha</button>' : '') : '<small class="usem">sem senha ainda' + (S.convites[u] ? '<br>convite <b class="num">' + esc(S.convites[u]) + '</b>' : '') + '</small>') + '</td></tr>').join('') +
       (ADMIN ? '<tr class="ladd"><td><input id="uNome" placeholder="Novo usuário" autocomplete="off"></td><td class="r"><button type="button" class="btn sm y" id="uAdd">Adicionar</button></td></tr>' : '') + '</tbody></table></section>';
@@ -2971,7 +2979,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   const acPerfil = (id) => (S.acesso.perfis || []).find((p) => p.id === id);
   const acAdmin = () => modsDe(S.acesso, S.user).includes('cfg');
   function acAplica(){
-    const ok = telasDe(S.acesso, S.user), mods = modsDe(S.acesso, S.user), GRP = { dir: 'dir', fin: 'fin' };
+    const ok = telasDe(S.acesso, S.user).filter((t) => S.colaboradores || !RH_TELAS.includes(t)), mods = modsDe(S.acesso, S.user), GRP = { dir: 'dir', fin: 'fin', rh: 'rh' };
     document.querySelectorAll('.tabs [data-tela]').forEach((b) => { const g = b.closest('.navgrp'), mk = g && GRP[g.dataset.grp]; b.hidden = !ok.includes(b.dataset.tela) || (mk ? !mods.includes(mk) : false); });
     document.querySelectorAll('.tabs .navgrp').forEach((g) => { g.hidden = !g.querySelector('[data-tela]:not([hidden])'); });
     if (!ok.includes(view.tela)) { view.tela = ok[0]; view.modal = null; }
@@ -3073,6 +3081,7 @@ export function iniciarTelas({ dados, api, sync, aoSair }) {
   const DIR = criarDiretoria({ getS: () => S, view, render, act, toast, api, esc, money, num, pad, cap, MESES, MES3, mesNome, mAdd, CUR, agora, cellVal, normTxt,
     carregarExcel: () => loadJs(XLS), admin: ADMIN, fat: dados.fatHistorico || [], imp: CFG.dirFatImp,
     DRE_ANO: +DRE_MESES[0].slice(0, 4), dreData, histAno, parcInfo, chqSit, chqValor, abrirLanc: (k, id) => openLanc(k, id) });
+  const RH = criarRh({ getS: () => S, view, render, act, toast, save, esc, money, dmy, dm, parse, iso, addDays, agora, quando, HOJE, cellVal, carregarExcel: () => loadJs(XLS) });
   render();
   return { recarregar: (d) => d };
 }
