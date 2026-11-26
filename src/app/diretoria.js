@@ -199,7 +199,8 @@ export function criarDiretoria(ctx){
   // despesas por grupo e mês: { mk: { grupo: valor } } e subcategorias
   function dirDesp(){
     const G = {}, SUB = {};
-    [ANO - 1, ANO].forEach((ano) => {
+    // ANO − 2 entra para o ano anterior ter com o que comparar (ex.: 2025 contra 2024)
+    [ANO - 2, ANO - 1, ANO].forEach((ano) => {
       const D = dirDre(ano); if (!D) return;
       for (let i = 0; i < 12; i++) {
         const mk = ano + '-' + pad(i + 1), g = G[mk] = {};
