@@ -719,6 +719,7 @@ export function criarDiretoria(ctx){
   function msfOpen(btn){
     const key = btn.dataset.msf, d = msfDef(key); if (!d) return;
     msf = { key, id: btn.id, q: '' };
+    document.documentElement.classList.add('msf-lock');   // com a lista aberta a página não rola (a roda do mouse fica só na lista)
     const h = msfHostEl();
     h.innerHTML = '<div class="msf" role="dialog" aria-label="Filtro">' +
       '<div class="msfs"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="text" class="msfq" placeholder="Digite para buscar" autocomplete="off" aria-label="Buscar opção"></div>' +
@@ -736,7 +737,7 @@ export function criarDiretoria(ctx){
     p.style.width = W + 'px'; p.style.left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8)) + 'px';
     p.style.top = up ? 'auto' : (r.bottom + 2) + 'px'; p.style.bottom = up ? (window.innerHeight - r.top + 2) + 'px' : 'auto';
   }
-  function msfClose(){ if (!msf) return; const a = document.getElementById(msf.id); msf = null; const h = document.getElementById('msfHost'); if (h) h.innerHTML = ''; if (a) a.setAttribute('aria-expanded', 'false'); }
+  function msfClose(){ document.documentElement.classList.remove('msf-lock'); if (!msf) return; const a = document.getElementById(msf.id); msf = null; const h = document.getElementById('msfHost'); if (h) h.innerHTML = ''; if (a) a.setAttribute('aria-expanded', 'false'); }
   document.addEventListener('mousedown', (e) => {
     const t = e.target; if (t.closest && t.closest('#msfHost')) return;
     const b = t.closest && t.closest('[data-msf]');

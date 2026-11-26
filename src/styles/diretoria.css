@@ -222,3 +222,7 @@ html.dlm-lock{scrollbar-gutter:stable}
 /* qualquer modal aberto trava a rolagem da tela (lista da Diretoria e modais do app, como o do lançamento) */
 html:has(#dlmHost .dlmbg),html:has(#modalHost .modal-bg){overflow:hidden!important;scrollbar-gutter:stable}
 html:has(#dlmHost .dlmbg) body,html:has(#modalHost .modal-bg) body{overflow:hidden!important}
+/* lista dos filtros aberta: a página fica parada e a rolagem da lista não passa para a página */
+html.msf-lock,html.msf-lock body{overflow:hidden!important;overscroll-behavior:none}
+html.msf-lock{scrollbar-gutter:stable}
+#msfHost .msfl{overscroll-behavior:contain}
