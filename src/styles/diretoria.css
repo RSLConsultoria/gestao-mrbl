@@ -170,3 +170,4 @@ th.r.dth .dsort{flex-direction:row-reverse}
 .dmi.dfd{width:150px}
 .dcfg td small{display:block;color:var(--muted);font-size:12px}
 table.dfdt{max-width:760px}table.dfdt td{padding-top:4px;padding-bottom:4px}
+.dcfg .dbtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}

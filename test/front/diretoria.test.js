@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clienteChave, periodo, lerSemanal, fatComDre } from '../../src/app/diretoria.js';
+import { clienteChave, periodo, lerSemanal, fatComDre, lerFatDre } from '../../src/app/diretoria.js';
 import { diferenca, fotografar } from '../../src/app/sync.js';
 
 describe('Diretoria: regras', () => {
@@ -80,5 +80,18 @@ describe('Diretoria: faturamento em R$ vem da DRE, peças da planilha', () => {
     const S = { dirFatDre: null };
     const f = fotografar(S); S.dirFatDre = { '2026-02': 111111 };
     expect(diferenca(f, S).mud.Config).toEqual({ dirFatDre: { '2026-02': 111111 } });
+  });
+});
+
+describe('Diretoria: linha FATURAMENTO da aba DRE', () => {
+  it('lê os meses com valor da linha FATURAMENTO abaixo dos meses (colunas intercaladas, como na DRE)', () => {
+    const M = ['JANEIRO ', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+    const cab = ['REGIME DE CAIXA']; M.forEach((m) => cab.push(m, 2030));
+    const fat = ['FATURAMENTO 2030']; M.forEach((_, i) => fat.push(i < 2 ? 1000 + i : i === 2 ? 'R$ 2.500,50' : 0, '\u00a0'));
+    const r = lerFatDre([['DRE GERENCIAL 2030'], ['FATURAMENTO 2030', null, null, 0], cab, ['SALDO INICIAL', 5, null, 6], fat], '2030');
+    expect(r).toEqual({ ano: '2030', meses: { '2030-01': 1000, '2030-02': 1001, '2030-03': 2500.5 } });
+  });
+  it('avisa quando não acha os meses', () => {
+    expect(() => lerFatDre([['FATURAMENTO', 1, 2]], '2030')).toThrow(/meses/);
   });
 });

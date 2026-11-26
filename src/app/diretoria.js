@@ -34,6 +34,25 @@ const numPlan = (v) => { if (v == null || v === '') return null; if (typeof v ==
 // MARÇO...), que traz o total do mês. Assim o mês bate com o total que a planilha mostra, mesmo quando a "Data Fat."
 // está vazia, em texto ("04 e 05/02/2025") ou com o ano digitado errado. Sem o ano da aba (ou linhas depois do
 // último bloco), vale o mês da Data Fat.
+// Linha FATURAMENTO de uma aba da DRE (ex.: "DRE 2026"): acha a linha dos meses (JANEIRO a DEZEMBRO, uma coluna
+// por mês, como na planilha DRE FLUXO DE CAIXA) e, abaixo dela, a linha FATURAMENTO com valores. Devolve
+// { ano, meses: { 'aaaa-mm': valor } } só com os meses que têm valor (mês zerado ainda não fechou).
+export function lerFatDre(linhas, anoAba){
+  const MS = ['JANEIRO', 'FEVEREIRO', 'MARCO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+  const hi = linhas.findIndex((r) => r && r.some((c) => semAcento(c) === 'JANEIRO'));
+  if (hi < 0) throw new Error('Não achei a linha dos meses (JANEIRO a DEZEMBRO) na aba.');
+  const H = linhas[hi], col = MS.map((m) => H.findIndex((c) => semAcento(c) === m));
+  if (col.some((c) => c < 0)) throw new Error('A linha dos meses não tem os 12 meses.');
+  const txtAno = linhas.slice(0, hi + 1).flat().map((c) => String(c == null ? '' : c)).find((t) => /^FATURAMENTO 20\d\d/i.test(t.trim()));
+  const ano = String(anoAba || (txtAno || '').match(/20\d\d/) || (H.find((c) => /^20\d\d$/.test(String(c))) || '')).match(/20\d\d/);
+  if (!ano) throw new Error('Não consegui saber de que ano é a DRE.');
+  const cand = linhas.slice(hi + 1).filter((r) => r && /^FATURAMENTO/.test(semAcento(r[0])));
+  const val = (r) => col.map((c) => numPlan(r[c]) || 0);
+  const lin = cand.map(val).sort((a, b) => b.filter(Boolean).length - a.filter(Boolean).length)[0];
+  if (!lin || !lin.some(Boolean)) throw new Error('Não achei a linha FATURAMENTO com valores abaixo dos meses.');
+  const meses = {}; lin.forEach((v, i) => { if (v > 0) meses[ano[0] + '-' + pad2(i + 1)] = Math.round(v * 100) / 100; });
+  return { ano: ano[0], meses };
+}
 const MESES_N = ['JANEIRO', 'FEVEREIRO', 'MARCO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 export function lerSemanal(linhas, anoAba){
   const rows = []; let semData = 0, ign = 0, noBloco = 0, pend = [];
@@ -555,7 +574,7 @@ export function criarDiretoria(ctx){
       return '<tr><td>' + cap(mesNome(mk)) + ' ' + mk.slice(0, 4) + '</td><td class="r num">' + (plan ? money(plan) : '—') + '</td><td class="r">' + campo + '</td><td class="r num">' + (dif == null ? '—' : (dif < 0 ? '−' : dif > 0 ? '+' : '') + money(Math.abs(dif))) + '</td></tr>';
     }).join('');
     return '<section class="panel"><div class="ph"><div><h2>Faturamento da DRE</h2><small class="dsub">O faturamento em R$ da Diretoria é a linha FATURAMENTO da DRE: consolida os CNPJs e já considera devoluções e refaturamentos. As peças continuam vindo da planilha do faturamento. ' +
-      'Os anos com DRE importada já aparecem; nos outros, digite o faturamento de cada mês fechado. Mês em branco usa o valor da planilha.</small></div><button type="button" class="btn sm pri" data-dcfg="fatdre">Salvar faturamento</button></div>' +
+      'Os anos com DRE importada já aparecem; nos outros, importe a planilha da DRE (aba DRE do ano, linha FATURAMENTO) ou digite o faturamento de cada mês fechado. Mês em branco usa o valor da planilha.</small></div><div class="dbtns">' + '<button type="button" class="btn sm" data-dcfg="fatdreimp">Importar DRE (Excel)</button><input type="file" id="dirDreFile" accept=".xlsx" hidden>' + '<button type="button" class="btn sm pri" data-dcfg="fatdre">Salvar faturamento</button></div></div>' +
       '<div class="pscroll"><table class="ptab dtab dfdt"><thead><tr><th>Mês</th><th class="r">Planilha do faturamento</th><th class="r">DRE (o que vale)</th><th class="r">DRE − planilha</th></tr></thead><tbody>' + tr + '</tbody>' +
       '<tfoot><tr class="totrow"><td>Diferença nos meses com DRE</td><td></td><td></td><td class="r num">' + (difT < 0 ? '−' : difT > 0 ? '+' : '') + money(Math.abs(difT)) + '</td></tr></tfoot></table></div></section>';
   }
@@ -680,6 +699,7 @@ export function criarDiretoria(ctx){
       const ms = {}; document.querySelectorAll('[data-dmeta]').forEach((i) => { const x = parseFloat(String(i.value || '').replace(',', '.')); ms[i.dataset.dmeta] = isFinite(x) && x > 0 ? x : 0; });
       act('Metas da Diretoria salvas.', () => { const s = ctx.getS(); s.dirMetaFat = mf; s.dirMetas = ms; }); return;
     }
+    if (dc && dc.dataset.dcfg === 'fatdreimp') { const f = document.getElementById('dirDreFile'); if (f) f.click(); return; }
     if (dc && dc.dataset.dcfg === 'fatdre') {
       const o = {}; let ruim = null;
       document.querySelectorAll('[data-dfatdre]').forEach((i) => { const t0 = String(i.value || '').trim(); if (!t0) return; const x = parseFloat(t0.replace(/R\$|\s/g, '').replace(/\./g, '').replace(',', '.')); if (!isFinite(x) || x <= 0) { ruim = ruim || i.dataset.dfatdre; return; } o[i.dataset.dfatdre] = Math.round(x * 100) / 100; });
@@ -696,6 +716,23 @@ export function criarDiretoria(ctx){
         view.modal = null; view.dirImp = null; render(); toast('Faturamento importado: ' + meses.size + (meses.size === 1 ? ' mês' : ' meses') + ' de ' + I.arquivo + '.', false);
       }).catch((err) => { I.enviando = false; render(); toast((err && err.message) || 'Não foi possível gravar a importação.', false); });
     }
+  });
+  // Importar DRE: lê a aba "DRE aaaa" e grava a linha FATURAMENTO dos meses com valor (os outros meses ficam como estão)
+  document.addEventListener('change', async (e) => {
+    if (e.target.id !== 'dirDreFile') return;
+    const file = e.target.files && e.target.files[0]; e.target.value = ''; if (!file) return;
+    try {
+      await ctx.carregarExcel();
+      const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await file.arrayBuffer());
+      const ws = wb.worksheets.find((w) => /^DRE 20\d\d$/i.test(w.name.trim())) || wb.worksheets.find((w) => /^DRE 20\d\d/i.test(w.name.trim()) && !/CONS|TESTE/i.test(w.name));
+      if (!ws) throw new Error('Não achei a aba da DRE do ano (ex.: "DRE 2026") no arquivo.');
+      const linhas = []; ws.eachRow({ includeEmpty: true }, (row, n) => { linhas[n - 1] = (row.values || []).slice(1).map(cellVal); });
+      for (let i = 0; i < linhas.length; i++) linhas[i] = linhas[i] || [];
+      const r = lerFatDre(linhas, (ws.name.match(/20\d\d/) || [])[0]), n = Object.keys(r.meses).length;
+      if (!n) throw new Error('A linha FATURAMENTO da aba ' + ws.name + ' está zerada.');
+      atual();
+      act('Faturamento da DRE ' + r.ano + ' importado da aba ' + ws.name + ' (' + n + (n === 1 ? ' mês' : ' meses') + ').', () => { const s0 = ctx.getS(); s0.dirFatDre = Object.assign({}, s0.dirFatDre || {}, r.meses); });
+    } catch (err) { console.error(err); toast(err && err.message ? err.message : 'Não consegui ler o arquivo.', false); }
   });
   document.addEventListener('change', async (e) => {
     if (e.target.id !== 'dirFile') return;
