@@ -166,6 +166,45 @@ function rhCusto(p){
   return o;
 }
 
+// ---------- rescisão (estimativa) ----------
+// Sem o relatório de férias em produção, o período aquisitivo sai da data de admissão (aniversário) e as férias
+// vencidas de períodos anteriores são digitadas na própria aba (dias e se já geram dobro).
+function rhAniv(adm, ano){ const d = parse(adm), y = new Date(ano, d.getMonth(), d.getDate()); if (y.getMonth() !== d.getMonth()) y.setDate(0); return iso(y); }
+function rhResc(p, tipo, data, fvDias, fvDobro){
+  if (p.sal == null || p.vinc === 'pj') return null;
+  const c = S_().rhCfg, rem = (+p.sal || 0) + (+p.pr || 0), adm = p.adm || data, anos = rhAnos(adm, data);
+  const avD = Math.min(90, 30 + 3 * anos), dia = parse(data).getDate();
+  const L = [], add = (k, v, nota) => { if (v) L.push([k, v, nota || '']); return v; };
+  const saldo = add('Saldo de salário', rem / 30 * Math.min(30, dia), dia + ' dias de ' + dmy(data).slice(3));
+  const avTot = tipo === 'sem' ? avD : 0;
+  const aviso = add('Aviso prévio indenizado', rem / 30 * avTot, avTot ? avD + ' dias (30 + 3 por ano de casa)' : '');
+  const proj = iso(addDays(parse(data), avTot));
+  // 13º do ano da saída (até a projeção ou 31/12) e, se a projeção do aviso passar da virada, os avos do ano seguinte
+  const anoS = data.slice(0, 4), fimAno = anoS + '-12-31', ini13 = adm > anoS + '-01-01' ? adm : anoS + '-01-01';
+  const m13 = tipo === 'justa' ? 0 : Math.min(12, rhMeses(ini13, proj < fimAno ? proj : fimAno)), m13b = tipo === 'justa' || proj <= fimAno ? 0 : Math.min(12, rhMeses(proj.slice(0, 4) + '-01-01', proj));
+  const d13 = add('13º proporcional', rem / 12 * (m13 + m13b), m13 + '/12 de ' + anoS + (m13b ? ' + ' + m13b + '/12 de ' + proj.slice(0, 4) : '') + (proj > data ? ' (conta a projeção do aviso)' : '') + '; sem descontar parcela já paga');
+  const fv = Math.max(0, +fvDias || 0);
+  add('Férias vencidas + 1/3', fv * rem / 30 * 4 / 3 * (fvDobro ? 2 : 1), fv ? fv + ' dias' + (fvDobro ? ' em dobro' : '') + ' (informado)' : '');
+  // período aquisitivo em curso: do último aniversário da admissão até a data da saída
+  let ini = rhAniv(adm, parse(data).getFullYear()); if (ini > data) ini = rhAniv(adm, parse(data).getFullYear() - 1);
+  const prox = rhAniv(adm, parse(ini).getFullYear() + 1);
+  let integ = 0, fpD = 0, fpIni = ini;
+  if (p.adm && proj >= prox) { integ = 30; fpIni = prox; } // a projeção do aviso completa o período
+  if (tipo !== 'justa' && p.adm) fpD = Math.min(30, rhMeses(fpIni, proj) * 2.5);
+  add('Férias do período completado + 1/3', integ * rem / 30 * 4 / 3, integ ? '30 dias (período ' + dmy(ini) + ' a ' + dmy(iso(addDays(parse(prox), -1))) + ')' : '');
+  add('Férias proporcionais + 1/3', fpD * rem / 30 * 4 / 3, fpD ? fpD.toLocaleString('pt-BR') + ' dias (desde ' + dmy(fpIni) + ')' : '');
+  const verbas = L.reduce((a, l) => a + l[1], 0);
+  const fr = (+c.fgts || 8) / 100, mCasa = Math.max(0, rhD(adm, data) / 30.44);
+  const saldoF = fr * (rem + rem / 12 + rem / 36) * mCasa;
+  const fgtsV = fr * (saldo + aviso + d13), multaP = tipo === 'sem' ? 0.4 : 0;
+  const R = [];
+  if (multaP) R.push(['Multa do FGTS (40%)', multaP * (saldoF + fgtsV), 'sobre o saldo estimado de ' + rhR(saldoF + fgtsV)]);
+  else { R.push(['FGTS do mês da rescisão', fgtsV, '8% sobre saldo e 13º']);
+    const simp = c.regime === 'simples' || c.regime === 'guia', cpp = simp ? 0 : c.regime === 'deson' ? 10 : +c.cpp || 20, rt = simp ? 0 : (+c.rat || 0) + (+c.terc || 0);
+    if (!simp) R.push(['INSS patronal, RAT e terceiros', (cpp + rt) / 100 * saldo + (rt + (c.regime === 'deson' ? 0 : cpp)) / 100 * d13, 'sobre saldo e 13º']); }
+  const rec = R.reduce((a, l) => a + l[1], 0);
+  return { L, R, verbas, rec, total: verbas + rec, avD, anos, saldoF, multaP, semAdm: !p.adm };
+}
 // ---------- hierarquia ----------
 function rhArvore(loc){
   const P = rhAtivos(), kids = {}, has = new Set(P.map((p) => p.id));
@@ -306,7 +345,7 @@ function rhTabela(){
 function rhRenderPes(){
   const F = rhV().p, P = rhAtivos(), setores = [...new Set(P.map((p) => p.setor).filter(Boolean))].sort();
   const lids = [...new Set(P.map((p) => p.lid).filter(Boolean))].map(rhById).filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome));
-  let h = rhHead('Colaboradores', P.length + ' pessoas · clique numa linha para ver o custo e os dados');
+  let h = rhHead('Colaboradores', P.length + ' pessoas · clique numa linha para ver o custo, a rescisão e os dados');
   h += '<div class="cptool rhtool"><div class="gsearch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="rhQ" value="' + esc(F.q) + '" placeholder="Buscar nome, apelido ou função" autocomplete="off"></div>' +
     selF('rhFLoc', 'Unidade', [['', 'Todas'], ['BP', 'Bragança Paulista'], ['SP', 'São Paulo'], ['TOL', 'Toledo']], F.loc) +
     selF('rhFPa', 'Área', [['', 'Todas'], ['prod', 'Produção'], ['adm', 'Administrativo']], F.pa || '') +
@@ -335,7 +374,7 @@ function rhModalP(){
   let b = '';
   if (!novo) b += pxInfo([['Unidade', RH_LOC[p0.loc] || p0.loc], ['Setor', esc(rhSetor(p0.setor))], ['Área', RH_PA[p0.pa] || 'Produção'], ['Líder', l ? esc(rhCurto(l.nome)) : ''], ['Tempo de casa', rhCasa(p0.adm)], ['Custo por mês', c ? rhR(c.total) : 'sem salário']]);
   if (p0 && p0.sit !== 'ativo') b += '<div class="cpalert ' + (p0.sit === 'aviso' ? 'red' : 'warn') + '"><b>' + rhSitNome(p0.sit) + (p0.ate ? ' até ' + dmy(p0.ate) : '') + '</b>' + (p0.nota ? '<span>' + esc(p0.nota) + '</span>' : '') + '</div>';
-    const T = novo ? [['dados', 'Dados']] : [['custo', 'Quanto custa'], ['dados', 'Dados']];
+    const T = novo ? [['dados', 'Dados']] : [['custo', 'Quanto custa'], ['resc', 'Rescisão'], ['dados', 'Dados']];
   const tab = novo ? 'dados' : V.tab;
   b += '<div class="pxtabs">' + T.map(([k, n]) => '<button type="button" data-rh="tab:' + k + '" aria-selected="' + (tab === k) + '">' + n + '</button>').join('') + '</div><div class="pxtabb">';
   const lin = (k, v, nota, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + k + (nota ? '<small class="rhsem">' + nota + '</small>' : '') + '</td><td class="r num">' + money(v) + '</td></tr>';
@@ -358,6 +397,21 @@ function rhModalP(){
           (c.vt ? lin('Vale-transporte', c.vt, c.vtU ? 'VT da unidade dividido entre os CLT dela' : 'menos 6% do salário') : '') + (c.outros ? lin('Outros benefícios', c.outros, 'alimentação, exames, seguro e cursos, rateados entre os CLT') : '') + (c.saude ? lin('Plano de saúde', c.saude) : '')) +
         lin('Custo por mês', c.total, (c.fator).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '× o ' + (pj ? 'valor da nota' : 'salário + prêmio'), 'tot') + lin('Custo por ano', c.total * 12, '', 'tot') + '</tbody></table>' +
         '<p class="cphint">Vínculo e provisões valem só para esta pessoa e ficam gravados ao clicar em Salvar. Encargos e benefícios da empresa mudam em Custos › Encargos e benefícios.</p>'; }
+  }
+  if (tab === 'resc') {
+    const R = V.res, r = rhResc(p, R.tipo, R.data || HOJE, R.fv, R.dobro);
+    if (p.vinc === 'pj') b += '<p class="cpvazio">PJ não tem rescisão CLT. O que vale é o contrato (aviso combinado e pagamento até a saída).</p>';
+    else {
+      b += '<div class="cptool">' + rhSeg('rtipo', R.tipo, [['sem', 'Demissão sem justa causa'], ['pedido', 'Pedido de demissão'], ['justa', 'Justa causa']]) +
+        '<label class="ffv rhdt"><span>Data da saída</span><input type="date" id="rhResD" value="' + esc(R.data || HOJE) + '"></label>' +
+        '<label class="ffv rhdt"><span>Férias vencidas (dias)</span><input type="number" min="0" max="60" step="1" id="rhResFv" value="' + esc(R.fv || '') + '" placeholder="0"></label>' +
+        '<label class="rhck"><input type="checkbox" id="rhResDb"' + (R.dobro ? ' checked' : '') + '> em dobro</label></div>';
+      if (!r) b += '<p class="cpvazio">Sem salário na planilha. Preencha em Dados para simular.</p>';
+      else b += (r.semAdm ? '<div class="cpalert warn"><b>Sem data de admissão</b><span>Sem ela não dá para contar tempo de casa, aviso, férias proporcionais nem o saldo do FGTS. Preencha em Dados.</span></div>' : '') +
+        '<table class="cpt cpmini rhcus"><tbody><tr class="sec"><td colspan="2">Pago ao colaborador</td></tr>' + r.L.map((x) => lin(x[0], x[1], x[2])).join('') + lin('Subtotal das verbas', r.verbas, '', 'sub') +
+        '<tr class="sec"><td colspan="2">Recolhido pela empresa</td></tr>' + r.R.map((x) => lin(x[0], x[1], x[2])).join('') + lin('Custo da rescisão', r.total, r.anos + (r.anos === 1 ? ' ano' : ' anos') + ' de casa', 'tot') + '</tbody></table>' +
+        '<p class="cphint">Estimativa. O período de férias em curso conta a partir do aniversário da admissão; férias vencidas de períodos anteriores entram pelo campo acima (veja o relatório de férias da contabilidade; "em dobro" quando o prazo de gozo já passou). O saldo do FGTS é calculado pelos meses de casa; o valor certo está no extrato da Caixa. Com a guia fixa, INSS patronal, RAT e Terceiros da rescisão já estão na guia. Não inclui descontos do colaborador (INSS, IR), banco de horas nem estabilidades' + (p0 && ['gestante', 'licenca'].includes(p0.sit) ? ' (<b>atenção: gestante/licença tem estabilidade</b>)' : '') + '.</p>';
+    }
   }
   if (tab === 'dados') {
     const fld = (lab, inner, cls) => '<label class="ffv' + (cls ? ' ' + cls : '') + '"><span>' + lab + '</span>' + inner + '</label>';
@@ -507,6 +561,8 @@ document.addEventListener('change', (e) => {
   if (e.target.dataset && e.target.dataset.rhprov) { rhLerEd(); const ed = view.rhEd, k = e.target.dataset.rhprov; ed.prov = Object.assign(rhProv({ vinc: ed.vinc, prov: ed.prov }), { [k]: e.target.checked }); if (k === 'fer' && e.target.checked && ed.vinc !== 'pj') ed.prov.ter = true; return render(); }
   if (id === 'rheVinc') { rhLerEd(); const ed = view.rhEd; ed.prov = ed.vinc === 'pj' ? { d13: false, fer: false, ter: false, multa: false } : { d13: true, fer: true, ter: true, multa: !!S_().rhCfg.multa }; return render(); }
   if (id === 'rhResD') { rhLerEd(); rhV().res.data = e.target.value || HOJE; return render(); }
+  if (id === 'rhResFv') { rhLerEd(); rhV().res.fv = Math.max(0, Math.min(60, Math.round(+e.target.value || 0))); return render(); }
+  if (id === 'rhResDb') { rhLerEd(); rhV().res.dobro = e.target.checked; return render(); }
   if (/^rhe(Sal|Pr|Adm|Lid)$/.test(id) && rhV().tab !== 'dados') { rhLerEd(); return render(); }
 });
 
@@ -562,3 +618,4 @@ document.addEventListener('change', async (e) => {
 
 return { telas: RH_TELAS, ehTela: rhTela, render: renderRh, modal: () => view.modal === 'rh:imp' ? rhImpModal() : rhModal(), cfg: cfgRh, ensure: ensureRh };
 }
+
